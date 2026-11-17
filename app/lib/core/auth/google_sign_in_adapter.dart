@@ -22,7 +22,7 @@ class GoogleSignInAdapter {
     if (_initialized) {
       return;
     }
-    final serverClientId = AppConfig.googleServerClientId;
+    const serverClientId = AppConfig.googleServerClientId;
     await _googleSignIn.initialize(
       serverClientId: serverClientId.isEmpty ? null : serverClientId,
     );

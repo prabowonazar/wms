@@ -91,7 +91,7 @@ class AuthRepository {
       throw AuthException(error.code, _messageFor(error));
     } catch (_) {
       await _telemetry.logEvent(TelemetryEvents.loginFailed);
-      throw AuthException(
+      throw const AuthException(
         'sign_in_failed',
         'Login gagal. Periksa jaringan lalu coba lagi.',
       );

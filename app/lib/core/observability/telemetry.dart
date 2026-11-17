@@ -99,7 +99,9 @@ class FirebaseTelemetry implements Telemetry {
   }
 
   @override
-  Future<void> crashForTesting() async {
-    await FirebaseCrashlytics.instance.crash();
+  Future<void> crashForTesting() {
+    // `crash()` bertipe void di crashlytics 4.x, jadi tidak boleh di-await.
+    FirebaseCrashlytics.instance.crash();
+    return Future<void>.value();
   }
 }

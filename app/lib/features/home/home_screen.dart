@@ -157,7 +157,7 @@ class HomeScreen extends StatelessWidget {
 }
 
 class _ProfileCard extends StatelessWidget {
-  const _ProfileCard({super.key, required this.profile});
+  const _ProfileCard({required this.profile});
 
   final UserProfile profile;
 
@@ -230,7 +230,6 @@ class _ProfileCard extends StatelessWidget {
 
 class _SettingsSheet extends StatelessWidget {
   const _SettingsSheet({
-    super.key,
     required this.services,
     required this.profile,
     required this.onSignOut,
@@ -271,10 +270,10 @@ class _SettingsSheet extends StatelessWidget {
               title: const Text('Gudang'),
               trailing: Text(profile.warehouseId),
             ),
-            ListTile(
+            const ListTile(
               contentPadding: EdgeInsets.zero,
-              leading: const Icon(Icons.info_outline),
-              title: const Text('Versi aplikasi'),
+              leading: Icon(Icons.info_outline),
+              title: Text('Versi aplikasi'),
               trailing: Text(AppConfig.appVersion),
             ),
             if (kDebugMode)

@@ -67,7 +67,7 @@ class BootstrapFailureApp extends StatelessWidget {
 }
 
 class _AuthGate extends StatefulWidget {
-  const _AuthGate({super.key, required this.services});
+  const _AuthGate({required this.services});
 
   final AppServices services;
 
@@ -114,7 +114,7 @@ class _AuthGateState extends State<_AuthGate> {
 }
 
 class _AuthErrorScreen extends StatelessWidget {
-  const _AuthErrorScreen({super.key, required this.onRetry});
+  const _AuthErrorScreen({required this.onRetry});
 
   final Future<void> Function() onRetry;
 

@@ -93,10 +93,10 @@ class _LoginScreenState extends State<LoginScreen> {
                   ),
                   const SizedBox(height: 32),
                   if (AppConfig.useEmulator)
-                    Padding(
-                      padding: const EdgeInsets.only(bottom: 12),
+                    const Padding(
+                      padding: EdgeInsets.only(bottom: 12),
                       child: Chip(
-                        avatar: const Icon(Icons.science_outlined, size: 18),
+                        avatar: Icon(Icons.science_outlined, size: 18),
                         label: Text(
                           'Mode emulator - ${AppConfig.emulatorHost}',
                         ),
