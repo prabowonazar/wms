@@ -36,6 +36,16 @@ jobs:
       - name: Test
         run: flutter test --coverage
 
+      # Mesin dev VS-0 belum punya Flutter, jadi pubspec.lock dihasilkan di CI
+      # lalu diunduh dan di-commit agar versi paket terkunci untuk semua mesin.
+      - name: Upload resolved lockfile
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pubspec-lock
+          path: app/pubspec.lock
+          if-no-files-found: ignore
+
       - name: Upload coverage
         if: always()
         uses: actions/upload-artifact@v4

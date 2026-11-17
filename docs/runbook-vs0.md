@@ -408,12 +408,18 @@ dan `setCrashlyticsCollectionEnabled(true)` (sudah dipanggil di bootstrap).
 | `rules` | `npm install` di `firebase/test`, lalu `firebase emulators:exec` | Node 20 + Java 17 |
 
 Catatan `build-apk`: karena `app/android/` belum di-commit, job ini membuat folder
-Android sementara lewat `flutter create` (hanya bila belum ada). Jadi ini **smoke
-build** - minSdk 26, ProGuard SQLCipher, dan manifest final tetap dibuat di mesin
-dev (bagian 3) dan dibuktikan di device. Setelah `app/android/` di-commit, langkah
-scaffold otomatis dilewati.
+Android sementara lewat `flutter create` (hanya bila belum ada) lalu menaikkan
+`minSdk` ke 26 (`firebase-auth` 23.2.1 menolak di bawah 23; PRD menargetkan
+Android 8.0+). Jadi ini **smoke build** - ProGuard SQLCipher dan manifest final
+tetap dibuat di mesin dev (bagian 3) dan dibuktikan di device. Setelah
+`app/android/` di-commit, langkah scaffold otomatis dilewati.
 
-Repo belum punya git. Inisialisasi:
+Job `app` juga mengunggah `pubspec.lock` sebagai artifact `pubspec-lock`. File
+itu diunduh dan di-commit supaya versi paket terkunci untuk semua mesin.
+
+Repo: `https://github.com/prabowonazar/wms` (publik, branch `main`). Push pertama
+sudah dilakukan; CI berjalan otomatis pada setiap push ke `main` dan setiap PR.
+Untuk repo baru:
 
 ```powershell
 git init
@@ -433,7 +439,7 @@ Jangan commit: `dart_defines/`, `google-services.json`, service account, `*.jks`
 
 | Hal | Status |
 |---|---|
-| File & struktur VS-0 | Selesai, diperiksa `verify-vs0.ps1` |
+| File & struktur VS-0 | Selesai, `verify-vs0.ps1` lolos (0 failure) |
 | JSON konfigurasi | Valid (dibaca PowerShell) |
 | Jumlah objek SQL (10/3/5) | Cocok dengan skema |
 | Skema dieksekusi di SQLite nyata | **Lolos** - `tools/verify-schema-sqlite.ps1` pada SQLite 3.43.2 (view, trigger, CHECK, generated column) |
@@ -441,15 +447,23 @@ Jangan commit: `dart_defines/`, `google-services.json`, service account, `*.jks`
 | 47 tiket unik | Ya |
 | Tidak ada kredensial ter-commit | Ya |
 | Skrip ASCII | Ya |
-| `flutter pub get` / resolusi dependency | **Belum dijalankan** |
-| `flutter analyze` | **Belum dijalankan** |
-| `flutter test` (termasuk FFI) | **Belum dijalankan** |
-| Build APK Android | **Belum dijalankan** |
-| Login Google nyata di device | **Belum dijalankan** |
+| `flutter pub get` | **Lolos di CI** (Flutter 3.32.5; `sqflite_sqlcipher` dipin 3.3.0) |
+| `flutter analyze` | **Bersih di CI** - `No issues found!` |
+| `flutter test` | **36 test lolos di CI** (termasuk FFI Schema dan widget test) |
+| Build APK Android | **Lolos di CI** sebagai smoke build (Android di-scaffold, minSdk 26); bukan bukti konfigurasi final |
+| Rules test emulator | **33 kasus lolos di CI** (target minimal 12) |
+| Functions unit test | **3 test lolos di CI** |
+| Versi paket terkunci (`pubspec.lock`) | Diambil dari artifact CI lalu di-commit |
+| Login Google nyata di device | **Belum dijalankan** (butuh project dev + SHA-1) |
 | SQLCipher di device | **Belum dibuktikan** (baru desain + test non-enkripsi via FFI) |
-| Rules test emulator | **Belum dijalankan** (butuh Node + Java) |
-| Functions unit test | **Belum dijalankan** (butuh Node) |
 | Crashlytics & Analytics | **Belum dibuktikan** |
+
+Bukti CI: run #4 (`ff6d171`) keempat job hijau. Detail per job:
+
+- `Flutter analyze & test`: 36 test lulus, coverage terunggah.
+- `Build debug APK`: `app-debug.apk` terbangun dan terunggah sebagai artifact.
+- `Firestore rules test`: `# pass 33`, `# fail 0`.
+- `Functions syntax & unit test`: `# pass 3`, `# fail 0`.
 
 ---
 
@@ -457,7 +471,7 @@ Jangan commit: `dart_defines/`, `google-services.json`, service account, `*.jks`
 
 | Risiko | Dampak | Mitigasi |
 |---|---|---|
-| Versi paket Firebase/google_sign_in belum di-resolve | `pub get` bisa memilih versi yang tidak kompatibel dengan Flutter 3.32 | Jalankan `flutter pub get`, commit `pubspec.lock`; naikkan Flutter bila perlu |
+| Paket Firebase terbaru butuh Flutter lebih baru | `pub get` gagal saat paket di-upgrade sembarangan | `sqflite_sqlcipher` dipin 3.3.0; `pubspec.lock` di-commit dari artifact CI sehingga versi terkunci |
 | API `google_sign_in` v7 berubah antar patch | Compile error di adapter | Semua pemakaian terisolasi di `google_sign_in_adapter.dart` |
 | Crashlytics tanpa `google-services.json` | Crash mungkin tidak terkirim / mapping tidak ter-upload | Uji di device; bila gagal, tambahkan plugin Google Services khusus build (tetap tanpa commit file) |
 | SQLCipher ter-strip saat release | DB gagal dibuka di rilis | ProGuard keep rule + uji APK release |
@@ -490,8 +504,8 @@ Jangan commit: `dart_defines/`, `google-services.json`, service account, `*.jks`
 
 ## 13. Definition of Done VS-0
 
-- [ ] CI 4 job hijau di commit terakhir.
-- [ ] `tools/verify-schema-sqlite.ps1` hijau dan `flutter test` hijau di CI.
+- [x] CI 4 job hijau di commit terakhir.
+- [x] `tools/verify-schema-sqlite.ps1` hijau dan `flutter test` hijau di CI.
 - [ ] APK dipasang di 2 device fisik; login 3 role berhasil.
 - [ ] Akun `active=false` menampilkan SCR-02, bukan crash.
 - [ ] Tutup-buka app tetap login tanpa dialog Google.
