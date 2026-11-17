@@ -79,6 +79,14 @@ jobs:
             flutter create --platforms=android --org id.co.contoh --project-name warehouse_mobile _scaffold
             cp -r _scaffold/android ./android
             rm -rf _scaffold
+            # PRD menargetkan Android 8.0+ (minSdk 26). Default Flutter 21 dan
+            # firebase-auth 23.2.1 menolak manifest merger di bawah 23.
+            if [ -f android/app/build.gradle.kts ]; then
+              sed -i 's/minSdk = flutter.minSdkVersion/minSdk = 26/' android/app/build.gradle.kts
+            else
+              sed -i 's/minSdkVersion flutter.minSdkVersion/minSdkVersion 26/' android/app/build.gradle
+            fi
+            grep -Rn "minSdk" android/app/build.gradle* | head -5
           fi
 
       - name: Build
