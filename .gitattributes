@@ -1,0 +1,18 @@
+# Normalisasi line ending agar diff/CI konsisten di Windows dan Linux.
+* text=auto
+
+*.dart      text eol=lf
+*.sql       text eol=lf
+*.md        text eol=lf
+*.csv       text eol=lf
+*.json      text eol=lf
+*.js        text eol=lf
+*.yml       text eol=lf
+*.yaml      text eol=lf
+*.ps1       text eol=crlf
+
+# Artefak biner
+*.png       binary
+*.jpg       binary
+*.jks       binary
+*.keystore  binary

@@ -1,0 +1,62 @@
+import 'package:google_sign_in/google_sign_in.dart';
+
+import '../config/app_config.dart';
+
+class SignInCancelled implements Exception {
+  const SignInCancelled();
+}
+
+/// Pembungkus tipis Google Sign-In v7.
+///
+/// Sengaja kecil dan terisolasi: API v7 berbeda dari v6 (`instance`,
+/// `initialize`, `authenticate`, `authentication.idToken`). Bila API berubah
+/// lagi, hanya file ini yang perlu diperbaiki.
+class GoogleSignInAdapter {
+  GoogleSignInAdapter({GoogleSignIn? googleSignIn})
+      : _googleSignIn = googleSignIn ?? GoogleSignIn.instance;
+
+  final GoogleSignIn _googleSignIn;
+  bool _initialized = false;
+
+  Future<void> _ensureInitialized() async {
+    if (_initialized) {
+      return;
+    }
+    final serverClientId = AppConfig.googleServerClientId;
+    await _googleSignIn.initialize(
+      serverClientId: serverClientId.isEmpty ? null : serverClientId,
+    );
+    _initialized = true;
+  }
+
+  /// Mengembalikan ID token, atau `null` bila token kosong.
+  Future<String?> idToken() async {
+    await _ensureInitialized();
+    if (!_googleSignIn.supportsAuthenticate()) {
+      throw StateError(
+        'Google Sign-In interaktif tidak didukung di platform ini.',
+      );
+    }
+
+    try {
+      final account = await _googleSignIn.authenticate();
+      final token = account.authentication.idToken;
+      if (token == null || token.isEmpty) {
+        return null;
+      }
+      return token;
+    } on GoogleSignInException catch (error) {
+      if (error.code == GoogleSignInExceptionCode.canceled) {
+        throw const SignInCancelled();
+      }
+      rethrow;
+    }
+  }
+
+  Future<void> signOut() async {
+    if (!_initialized) {
+      return;
+    }
+    await _googleSignIn.signOut();
+  }
+}

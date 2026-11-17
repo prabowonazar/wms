@@ -1,0 +1,16 @@
+kode_produk,nama_produk,tipe,uom,barcode_1,barcode_2,barcode_3,stok_minimum,status,kode_gudang,keterangan
+,Tanpa Kode,consumable,box,8991000000105,,,0,aktif,JKT-01,
+BRG 00010,Spasi di kode,consumable,box,8991000000112,,,0,aktif,JKT-01,
+BRG-00010,Produk A,consumable,box,8991000000129,,,0,aktif,JKT-01,
+BRG-00010,Produk A duplikat,consumable,box,8991000000136,,,0,aktif,JKT-01,
+BRG-00011,Tanpa Barcode,consumable,box,,,,0,aktif,JKT-01,
+BRG-00012,Produk Tipe Salah,chemical,box,8991000000143,,,,aktif,JKT-01,
+BRG-00013,Uom Salah,consumable,salah,8991000000150,,,0,aktif,JKT-01,
+BRG-00014,Barcode Ganda A,consumable,box,8991000000167,,,0,aktif,JKT-01,
+BRG-00015,Barcode Ganda B,consumable,box,8991000000167,,,0,aktif,JKT-01,
+BRG-00016,Stok Minus,consumable,box,8991000000174,,,-5,aktif,JKT-01,
+BRG-00017,Status Salah,consumable,box,8991000000181,,,0,aktifkan,JKT-01,
+BRG-00018,Gudang Salah,consumable,box,8991000000198,,,0,aktif,JKT-99,
+BRG-00019,=SUM(A1:A9),consumable,box,8991000000204,,,0,aktif,JKT-01,
+BRG-00020,AB,consumable,box,8991000000211,,,0,aktif,JKT-01,
+BRG-00021,Nama Panjang,consumable,box,8991000000228,,,0,aktif,JKT-01,Keterangan ini sengaja dibuat sangat panjang untuk menguji batas maksimum dua ratus karakter pada kolom keterangan produk sehingga validator harus menolaknya dengan kode kesalahan yang tepat dan pesan yang jelas bagi operator gudang yang mengisi template ini.

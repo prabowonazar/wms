@@ -1,0 +1,48 @@
+id,epic,judul,jenis,ref,estimasi_hari,estimasi_jam,milestone,opsional,acceptance_criteria
+VS0-01,Fondasi & walking skeleton,"[VS0-01] Repo, CI, flavor dev/prod",Enabler,NFR-MNT-01,1,8,G0,tidak,flutter analyze/test + test Functions + build APK hijau di CI; tidak ada kredensial di repo
+VS0-02,Fondasi & walking skeleton,[VS0-02] Firebase project dev + emulator lokal,Feature,,0.5,4,G0,tidak,Satu perintah menyalakan emulator Auth/Firestore/Functions; app dev menunjuk ke project dev
+VS0-03,Fondasi & walking skeleton,[VS0-03] Login Google + users/{uid} + role gate,Feature,FR-AUTH-01..05,1.5,12,G0,tidak,3 role masuk ke beranda berbeda; active=false → SCR-02; sesi bertahan setelah app ditutup
+VS0-04,Fondasi & walking skeleton,[VS0-04] Rules v1 + rules unit test,Enabler,NFR-SEC-04,1,8,G0,tidak,≥12 kasus izin/tolak hijau di CI; transactions menolak update/delete klien
+VS0-05,Fondasi & walking skeleton,[VS0-05] SQLite + SQLCipher + migrasi v1,Enabler,NFR-SEC-02,1,8,G0,tidak,File DB tidak terbaca tanpa kunci; migrasi dari kosong & dari v1 idempoten
+VS0-06,Fondasi & walking skeleton,[VS0-06] Crash & log baseline,Enabler,NFR-MNT-01,0.5,4,G0,tidak,Crash uji muncul di Crashlytics; event app_open + login_success tercatat
+VS1-01,Scan & master data offline,[VS1-01] Sync master full + delta,Feature,"FR-MST-01, BR-11",2,16,G1,tidak,2.000 produk/10.000 barcode ≤60 s @3 Mbps; delta 50 perubahan ≤5 s; lastSyncAt tersimpan
+VS1-02,Scan & master data offline,[VS1-02] Layar scan + izin kamera + debounce,Feature,FR-SCN-01/02,2,16,G1,tidak,20 barcode nyata terbaca; hasil ganda <800 ms diabaikan; izin ditolak → pesan + tombol setelan
+VS1-03,Scan & master data offline,[VS1-03] Lookup lokal + barcode tak dikenal,Feature,"FR-MST-02, FR-SCN-03",1,8,G1,tidak,p95 lookup ≤50 ms pada 10.000 barcode; barcode asing → SCR-06 tanpa jaringan
+VS1-04,Scan & master data offline,[VS1-04] Cari & input manual,Feature,FR-SCN-10,1.5,12,G1,tidak,Cari 3 karakter ≤300 ms; kode persis membuka lembar transaksi; kode tidak ada → pesan jelas
+VS1-05,Scan & master data offline,[VS1-05] Banner master usang,Feature,FR-MST-03,0.5,4,G1,tidak,Muncul tepat setelah >24 jam; hilang setelah sync sukses
+VS1-06,Scan & master data offline,[VS1-06] Pipeline import produk,Feature,"FR-MST-04/05, BR-13",1.5,12,G1,tidak,100 produk dari template masuk ke products + barcodes; barcode duplikat ditolak; device menerima di delta berikutnya
+VS1-07,Scan & master data offline,[VS1-07] Baseline latency scan (M5),Enabler,NFR-PERF-02,0.5,4,G1,tidak,Event durasi scan_start→product_shown tercatat; p50/p95 bisa dihitung dari data
+VS2-01,Core loop: transaksi offline → sync → saldo,"[VS2-01] Lembar transaksi (jenis, qty, +/−)",Feature,FR-SCN-04/05,2,16,G2,tidak,Masuk/keluar; qty 0 ditolak; maksimum 3 tap dari scan ke simpan
+VS2-02,Core loop: transaksi offline → sync → saldo,[VS2-02] Submit idempoten + UUIDv7 + SQLite atomik,Feature,"FR-SCN-06/07, BR-04",2,16,G2,tidak,"Tap 5× → 1 baris; force-stop 20× → 0 baris setengah; p95 ≤1,5 s offline"
+VS2-03,Core loop: transaksi offline → sync → saldo,[VS2-03] Outbox worker (WorkManager),Feature,"FR-SYN-01, BR-04",2,16,G2,tidak,300 transaksi setelah airplane 30 menit → 100% terkirim; replay 10× → tetap 300 dokumen
+VS2-04,Core loop: transaksi offline → sync → saldo,[VS2-04] Function applyBalance,Feature,BR-01/03,2,16,G2,tidak,1.000 operasi acak → saldo = Σ signedQty (selisih 0); replay 100× → saldo berubah 1×
+VS2-05,Core loop: transaksi offline → sync → saldo,[VS2-05] Stok negatif + override supervisor,Feature,"FR-SCN-09, BR-03",1.5,12,G2,tidak,"Keluar > saldo → SCR-08, saldo tidak berubah; override supervisor wajib alasan, tercatat auditLogs"
+VS2-06,Core loop: transaksi offline → sync → saldo,[VS2-06] Saldo & stock card lokal,Feature,FR-STK-01/02,1.5,12,G2,tidak,Saldo berubah ≤1 s setelah submit; stock card hari ini cocok dengan jumlah ledger
+VS3-01,"Kepercayaan: status sync, retry, konflik, histori",[VS3-01] Layar sinkronisasi + status per transaksi,Feature,FR-SYN-03,2,16,G3,tidak,4 status tampil dengan warna & teks; alasan gagal terbaca; badge pending di beranda
+VS3-02,"Kepercayaan: status sync, retry, konflik, histori",[VS3-02] Sync manual,Feature,FR-SYN-04,0.5,4,G3,tidak,Tombol memicu worker; umpan balik ≤300 ms; tidak bisa dobel-trigger
+VS3-03,"Kepercayaan: status sync, retry, konflik, histori",[VS3-03] Retry/backoff + status failed,Feature,FR-SYN-02,1.5,12,G3,tidak,Berhenti setelah 5 percobaan; alasan tersimpan; tidak ada loop tanpa akhir
+VS3-04,"Kepercayaan: status sync, retry, konflik, histori",[VS3-04] Konflik saldo + resolusi,Feature,"FR-STK-09, BR-12",2,16,G3,tidak,Device ≠ server → entri stockConflicts; supervisor menyelesaikan dgn alasan; angka akhir konsisten
+VS3-05,"Kepercayaan: status sync, retry, konflik, histori",[VS3-05] Reversal + audit,Feature,"FR-SCN-08, BR-06",2,16,G3,tidak,"Reversal ganda ditolak; transaksi asli tetap ada; auditLogs memuat aktor, alasan, entity"
+VS3-06,"Kepercayaan: status sync, retry, konflik, histori",[VS3-06] Histori + filter,Feature,"FR-RPT-01, BR-09",1.5,12,G3,tidak,Filter 7 hari/jenis/produk; operator hanya melihat miliknya; supervisor melihat gudang
+VS3-07,"Kepercayaan: status sync, retry, konflik, histori",[VS3-07] Sesi offline 7 hari,Feature,FR-AUTH-06,0.5,4,G3,tidak,Hari ke-8 wajib login ulang; transaksi pending tidak hilang saat re-auth
+VS4-01,"Laporan, closing, export Sheets, admin",[VS4-01] Periode + closing harian 00:05 WIB,Feature,FR-STK-08,2,16,G4,tidak,Snapshot dibuat; periode terkunci; transaksi telat masuk periode berikutnya dan muncul di laporan rekonsiliasi
+VS4-02,"Laporan, closing, export Sheets, admin",[VS4-02] Stock card periode,Feature,FR-STK-02/FR-RPT-02,2,16,G4,tidak,opening + in − out + adj = ending untuk semua produk; periode tertutup read-only
+VS4-03,"Laporan, closing, export Sheets, admin",[VS4-03] Export Sheets D-1,Feature,"FR-SYN-05/06, BR-05",2,16,G4,tidak,5.000 baris ≤5 menit; export ulang 0 duplikat; sheetExports mencatat rowCount
+VS4-04,"Laporan, closing, export Sheets, admin",[VS4-04] Rekonsiliasi + deteksi edit,Feature,FR-SYN-07,1.5,12,G4,tidak,Checksum cocok; edit manual 1 baris → status tampered + laporan selisih
+VS4-05,"Laporan, closing, export Sheets, admin",[VS4-05] Admin: user & monitoring,Feature,FR-ADM-01/02,1.5,12,G4,tidak,Tambah/nonaktif user; daftar failed + retry paksa; semua tercatat audit
+VS4-06,"Laporan, closing, export Sheets, admin",[VS4-06] Dashboard ringkas,Feature,FR-RPT-05,1,8,G4,tidak,"Total produk, transaksi hari ini, perlu restock; tampil ≤2 s di device mid-range"
+VS4-07,"Laporan, closing, export Sheets, admin","[VS4-07] Export PDF & CSV (Should, bisa dipotong)",Feature,FR-RPT-03/04,1.5,12,G4,ya,A4 + kop gudang; CSV bisa dibuka di Excel tanpa kerusakan encoding
+VS5-01,Cycle count → adjustment → approval,[VS5-01] Mulai sesi + aturan satu sesi open,Feature,"FR-STK-03, BR-10",1.5,12,G5,tidak,Sesi kedua ditolak dengan pesan jelas; sesi bisa dibuat saat offline lalu tersinkron
+VS5-02,Cycle count → adjustment → approval,[VS5-02] Hitung fisik + autosave,Feature,FR-STK-04,2,16,G5,tidak,120 baris; app di-kill → progres utuh; produk dihitung 2× → minta konfirmasi
+VS5-03,Cycle count → adjustment → approval,[VS5-03] Review variance + submit,Feature,"FR-STK-05/06, BR-02",2,16,G5,tidak,variance = counted − system; variance 0 tidak membuat adjustment; submit offline masuk antrean
+VS5-04,Cycle count → adjustment → approval,[VS5-04] Approval/reject + adjustment idempoten,Feature,FR-STK-07,2,16,G5,tidak,Approve 2× → 1 set adjustment; reject wajib alasan; saldo akhir = countedQty
+VS5-05,Cycle count → adjustment → approval,[VS5-05] Status sesi + auto-approve variance 0,Feature,FR-STK-06,1,8,G5,tidak,Semua variance 0 → approved tanpa adjustment
+VS5-06,Cycle count → adjustment → approval,[VS5-06] Tab konflik pada layar persetujuan,Feature,FR-STK-09,0.5,4,G5,tidak,Daftar konflik + aksi resolusi tersedia bagi supervisor
+VS5-07,Cycle count → adjustment → approval,[VS5-07] Ukur M1 & M7,Measurement,"M1, M7",1,8,G5,tidak,Stock accuracy & durasi sesi terhitung dari data nyata; dilaporkan per sesi
+VS6-01,Hardening & kesiapan rollout,[VS6-01] Rules test suite lengkap + review akses,Enabler,NFR-SEC-04,1.5,12,G6,tidak,≥40 kasus; semua koleksi tercakup; tidak ada aturan if true
+VS6-02,Hardening & kesiapan rollout,[VS6-02] Perf budget di device low-end,Enabler,NFR-PERF-01/02,1.5,12,G6,tidak,p95 sesuai NFR di 2 device; regresi >10% menggagalkan CI
+VS6-03,Hardening & kesiapan rollout,[VS6-03] Audit aksesibilitas,Enabler,NFR-USA-01/02,1,8,G6,tidak,"Kontras AA, target 48dp, ≤3 tap; temuan P1 nol"
+VS6-04,Hardening & kesiapan rollout,[VS6-04] Empty & error state global,Feature,UX §8.5,1,8,G6,tidak,10 kondisi punya layar/pesan sesuai copy deck
+VS6-05,Hardening & kesiapan rollout,[VS6-05] Observability M1–M7,Measurement,M1–M7,1.5,12,G6,tidak,Tiap metrik punya query + alarm; sync gagal >1% memicu notifikasi
+VS6-06,Hardening & kesiapan rollout,[VS6-06] Latihan restore & rollback,Enabler,NFR-DATA-03,1,8,G6,tidak,"RTO ≤4 jam, RPO ≤15 menit terbukti di dev"
+VS6-07,Hardening & kesiapan rollout,[VS6-07] Materi pilot + seeding 100 SKU,Feature,,1,8,G6,tidak,100 SKU asli terimpor; 3 operator terlatih; checklist harian tersedia

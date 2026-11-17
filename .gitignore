@@ -1,0 +1,48 @@
+# Flutter / Dart
+app/.dart_tool/
+app/.flutter-plugins
+app/.flutter-plugins-dependencies
+app/.packages
+app/build/
+app/coverage/
+app/android/.gradle/
+app/android/local.properties
+app/android/app/debug/
+app/android/app/profile/
+app/android/app/release/
+app/android/key.properties
+app/ios/Pods/
+app/macos/Pods/
+app/.metadata
+
+# Firebase
+firebase/functions/node_modules/
+firebase/**/node_modules/
+firebase/node_modules/
+firebase/.firebase/
+firebase/*-debug.log
+firebase/firestore-debug.log
+firebase/ui-debug.log
+firebase/.runtimeconfig.json
+**/service-account*.json
+**/google-services.json
+**/GoogleService-Info.plist
+
+# Secrets / env
+.env
+.env.*
+!.env.example
+dart_defines/
+*.keystore
+*.jks
+
+# Editor / OS
+.vscode/
+.idea/
+*.iml
+.DS_Store
+Thumbs.db
+
+# Hasil generate (boleh dibuat ulang)
+coverage/
+*.log

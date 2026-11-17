@@ -1,0 +1,144 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+env:
+  FLUTTER_VERSION: '3.32.5'
+  NODE_VERSION: '20'
+
+jobs:
+  app:
+    name: Flutter analyze & test
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: app
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Analyze
+        run: flutter analyze
+
+      - name: Test
+        run: flutter test --coverage
+
+      - name: Upload coverage
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-coverage
+          path: app/coverage/lcov.info
+          if-no-files-found: ignore
+
+  build-apk:
+    name: Build debug APK
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: app
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      # Folder app/android/ belum di-commit (dibuat oleh Flutter SDK). Job ini
+      # membuatnya sementara agar build tetap terbukti. Begitu app/android/
+      # di-commit dari mesin dev, langkah ini otomatis dilewati.
+      # Catatan: ini smoke build - minSdk/ProGuard/manifest final diatur di
+      # runbook-vs0.md section 3 dan harus dibuktikan di device.
+      - name: Scaffold Android platform (sementara)
+        run: |
+          if [ ! -d android ]; then
+            flutter create --platforms=android --org id.co.contoh --project-name warehouse_mobile _scaffold
+            cp -r _scaffold/android ./android
+            rm -rf _scaffold
+          fi
+
+      - name: Build
+        run: |
+          flutter build apk --debug \
+            --dart-define=FB_PROJECT_ID=demo-warehouse \
+            --dart-define=FB_API_KEY=demo-api-key \
+            --dart-define=FB_APP_ID=1:000000000000:android:demo \
+            --dart-define=FB_MESSAGING_SENDER_ID=000000000000 \
+            --dart-define=GOOGLE_SERVER_CLIENT_ID=demo.apps.googleusercontent.com
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-debug-apk
+          path: app/build/app/outputs/flutter-apk/app-debug.apk
+
+  functions:
+    name: Functions syntax & unit test
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: firebase/functions
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Syntax check
+        run: node --check index.js
+
+      - name: Unit test
+        run: node --test test/
+
+  rules:
+    name: Firestore rules test
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Install test dependencies
+        working-directory: firebase/test
+        run: npm install --no-audit --no-fund
+
+      - name: Install Firebase CLI
+        run: npm install --global firebase-tools@13
+
+      - name: Run rules test against emulator
+        working-directory: firebase
+        run: firebase emulators:exec --only firestore --project demo-warehouse "node --test test/"

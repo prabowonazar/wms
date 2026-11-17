@@ -1,0 +1,4 @@
+kode_produk,nama_produk,tipe,uom,barcode_1,barcode_2,barcode_3,stok_minimum,status,kode_gudang,keterangan
+BRG-00001,Sarung Tangan Nitril M,consumable,box,8991000000017,8991000000024,,10,aktif,JKT-01,Ukuran M
+BRG-00002,Baut M8 x 40 mm,spare_part,pcs,8991000000031,,,50,aktif,JKT-01,
+BRG-00003,Lakban Bening 2 inci,consumable,roll,8991000000048,,,20,nonaktif,JKT-01,Digantikan BRG-00010
