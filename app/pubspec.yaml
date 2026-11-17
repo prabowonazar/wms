@@ -4,8 +4,8 @@ publish_to: "none"
 version: 0.1.0+1
 
 environment:
-  sdk: ">=3.4.0 <4.0.0"
-  flutter: ">=3.22.0"
+  sdk: ">=3.7.0 <4.0.0"
+  flutter: ">=3.29.0"
 
 dependencies:
   flutter:
@@ -20,7 +20,10 @@ dependencies:
   google_sign_in: ^7.0.0
 
   # Penyimpanan lokal (NFR-SEC-02: SQLCipher, kunci di Keystore)
-  sqflite_sqlcipher: ^3.4.1
+  # Dipin tepat: 3.4.x menuntut Dart >= 3.9 (Flutter >= 3.35), sedangkan CI
+  # memakai Flutter 3.32.5 (Dart 3.8). Pin juga membuat mesin SQLCipher sama
+  # di semua mesin - format file database tidak boleh berbeda antar device.
+  sqflite_sqlcipher: 3.3.0
   sqflite_common: ^2.5.4
   flutter_secure_storage: ^9.2.2
   path: ^1.9.0

@@ -45,7 +45,7 @@ Yang **tidak** dikerjakan di VS-0 (sesuai tiket): scan, stok, sync, notifikasi, 
 
 | Alat | Versi minimum | Catatan |
 |---|---|---|
-| Flutter | 3.27 (disarankan 3.32.x) | `google_sign_in` 7.x butuh Dart modern; CI memakai 3.32.5 |
+| Flutter | 3.29+ (CI memakai 3.32.5) | `google_sign_in` 7.x butuh Dart >= 3.7; `sqflite_sqlcipher` dipin 3.3.0 karena 3.4.x butuh Dart >= 3.9 |
 | Dart | 3.6+ | Ikut Flutter |
 | JDK | 17 | Gradle Android + Firestore emulator |
 | Android SDK | API 34 | Android 8.0 (API 26) tetap jadi target minimum |
