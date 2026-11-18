@@ -453,17 +453,28 @@ Jangan commit: `dart_defines/`, `google-services.json`, service account, `*.jks`
 | Build APK Android | **Lolos di CI** sebagai smoke build (Android di-scaffold, minSdk 26); bukan bukti konfigurasi final |
 | Rules test emulator | **33 kasus lolos di CI** (target minimal 12) |
 | Functions unit test | **3 test lolos di CI** |
-| Versi paket terkunci (`pubspec.lock`) | Diambil dari artifact CI lalu di-commit |
+| Versi paket terkunci (`pubspec.lock`) | Diambil dari artifact CI lalu di-commit (75 paket) |
 | Login Google nyata di device | **Belum dijalankan** (butuh project dev + SHA-1) |
 | SQLCipher di device | **Belum dibuktikan** (baru desain + test non-enkripsi via FFI) |
 | Crashlytics & Analytics | **Belum dibuktikan** |
 
-Bukti CI: run #4 (`ff6d171`) keempat job hijau. Detail per job:
+Bukti CI terakhir: run #7 (`d641019`) keempat job hijau, setelah `pubspec.lock`
+di-commit. Detail per job:
 
-- `Flutter analyze & test`: 36 test lulus, coverage terunggah.
+- `Flutter analyze & test`: `No issues found!` + 36 test lulus, coverage terunggah.
 - `Build debug APK`: `app-debug.apk` terbangun dan terunggah sebagai artifact.
 - `Firestore rules test`: `# pass 33`, `# fail 0`.
 - `Functions syntax & unit test`: `# pass 3`, `# fail 0`.
+
+Riwayat CI (semua kegagalan sudah diperbaiki dan dibuktikan ulang):
+
+| Run | Hasil | Penyebab |
+|---|---|---|
+| #1 | gagal | `pub get`: `sqflite_sqlcipher 3.4.x` butuh Dart >= 3.9 → dipin 3.3.0 |
+| #2 | gagal | analyzer: `crash()` bertipe `void` di-`await` + 4 warning `unused_element_parameter` |
+| #3 | gagal | build APK: `minSdk 21` < 23 yang dituntut `firebase-auth` |
+| #4 | **hijau** | bukti pertama: analyze bersih, 36 test, APK, rules 33, Functions 3 |
+| #7 | **hijau** | dengan `pubspec.lock` ter-commit |
 
 ---
 

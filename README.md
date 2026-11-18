@@ -6,13 +6,16 @@ sekali. Proyek ini dibangun bertahap lewat 7 vertical slice (VS-0..VS-6).
 
 ## Status
 
-**VS-0 (fondasi) - scaffold selesai, belum diverifikasi di device.**
+**VS-0 (fondasi) - scaffold selesai dan CI hijau; belum diverifikasi di device.**
 
 Yang sudah ada: login Google + role gate, database SQLCipher, skema v1, rules
 Firestore + 33 test rules, Cloud Functions `health`, CI, dan runbook.
 
-> Kode belum pernah dikompilasi di mesin ini karena Flutter/Dart/Node/Java belum
-> terpasang. Jalankan `docs/runbook-vs0.md` sebelum menganggap VS-0 selesai.
+> Mesin ini tidak punya Flutter/Dart/Node/Java, jadi seluruh bukti kompilasi
+> datang dari CI GitHub Actions (run #7, commit `d641019`): `flutter analyze`
+> bersih, 36 test Flutter lulus, APK debug terbangun, 33 test rules dan 3 test
+> Functions lulus. Yang masih terbuka hanya bukti di device: login Google nyata,
+> SQLCipher terenkripsi, Crashlytics, dan Analytics.
 
 ## Mulai cepat
 
