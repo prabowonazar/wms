@@ -337,7 +337,7 @@ Set-Location ..
 firebase emulators:exec --only firestore --project demo-warehouse "node --test test/"
 ```
 
-Harapan: 33 kasus lulus, emulator berhenti sendiri. Kasus mencakup:
+Harapan: 35 kasus lulus, emulator berhenti sendiri. Kasus mencakup:
 
 - default deny untuk pengguna tanpa login;
 - operator nonaktif tidak bisa membaca data, tetapi tetap bisa membaca profilnya;
