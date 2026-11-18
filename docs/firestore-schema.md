@@ -19,6 +19,7 @@ Dokumen pendamping: `PRD-v2.md`. Semua aturan bisnis mengacu ke `BR-*` di PRD.
 | `warehouses/{warehouseId}` | Dokumen | Admin | 1–5 |
 | `products/{productId}` | Dokumen | Cloud Function (import Sheet) | ≤ 10.000 |
 | `barcodes/{barcode}` | Dokumen (lookup) | Cloud Function | ≤ 20.000 |
+| `importLocks/{warehouseId}` | Dokumen (kunci sementara) | Cloud Function | 1–5, hanya saat impor |
 | `devices/{deviceId}` | Dokumen | Client | ≤ 100 |
 | `transactions/{transactionId}` | Dokumen | **Client (create)**, Function (metadata) | 10k–500k/tahun |
 | `warehouses/{wid}/balances/{productId}` | Dokumen | **Function only** | = jumlah produk |
@@ -103,8 +104,29 @@ Document ID = barcode yang sudah dinormalisasi (trim, uppercase untuk 1D). Ini m
 |---|---|---|---|
 | `productId` | string | ✅ | |
 | `productCode` | string | ✅ | Denormalisasi |
-| `format` | string | ✅ | `CODE128` \| `EAN13` \| `QR` \| `MANUAL` |
+| `format` | string | ✅ | `CODE128` \| `EAN13` \| `QR` \| `MANUAL` \| `UNKNOWN` |
 | `createdAt` | timestamp | ✅ | |
+
+> Import dari sheet tidak membawa format barcode, jadi `importProducts`
+> menulis `UNKNOWN`; app juga menyimpan `UNKNOWN` di SQLite karena
+> `products.barcodes` hanya array string. Format yang lebih presisi bisa
+> ditambahkan tanpa migrasi (field sudah ada).
+
+### 2.4a `importLocks/{warehouseId}` (kunci impor sementara)
+
+Mencegah dua admin mengimpor ke gudang yang sama pada saat bersamaan
+(VS1-06). Hanya Cloud Function (Admin SDK) yang membaca/menulis; rules
+menolak semua akses klien.
+
+| Field | Tipe | Wajib | Keterangan |
+|---|---|---|---|
+| `owner` | string | ✅ | `importId` pemegang kunci |
+| `actorUid` | string | ✅ | Admin yang menjalankan impor |
+| `expiresAt` | timestamp | ✅ | TTL 5 menit; kunci kedaluwarsa boleh diambil alih |
+| `updatedAt` | timestamp | ✅ | |
+
+> Kunci dihapus di blok `finally` setelah impor selesai. Bila Function mati
+> mendadak, kunci kedaluwarsa sendiri setelah 5 menit.
 
 ### 2.5 `devices/{deviceId}`
 
@@ -345,6 +367,7 @@ sebelum rilis (jalankan `firebase deploy --only firestore:indexes`).
 | `.../balances` | anggota gudang; admin | **tidak ada** (Function) |
 | `.../periods` + `stockCards` | anggota gudang; admin | **tidak ada** (Function) |
 | `products`, `barcodes` | semua user aktif | admin / Function |
+| `importLocks` | **tidak ada** | **tidak ada** (Function) |
 | `transactions` | pemilik; supervisor/admin semua | **create-only** oleh operator/supervisor |
 | `cycleCounts` + `countLines` | anggota gudang | hanya saat status `open`; submit dari `open` ke `submitted` |
 | `stockConflicts`, `auditLogs` | supervisor/admin | **tidak ada** |
@@ -438,6 +461,27 @@ App: query products where warehouseIds array-contains wid and updatedAt > lastSy
      → upsert ke SQLite products_cache + barcodes_cache
      → simpan lastSyncAt
 ```
+
+### 5.7 Import produk dari sheet (callable `importProducts`)
+
+```
+Admin (app/Apps Script) → callable importProducts { warehouseId, rows[<=100] }
+  1. verifikasi users/{uid}.role == 'admin' && active == true
+  2. validasi seluruh baris (all-or-nothing, BR-13)
+  3. importId = SHA-256(baris kanonik + warehouseId + schemaVersion)
+  4. auditLogs/{importId} sudah ada? → status 'skipped', 0 tulisan
+  5. batas 5 impor/jam per admin (auditLogs actorUid + at)
+  6. ambil kunci importLocks/{warehouseId} (TTL 5 menit)
+  7. satu transaksi Firestore: baca produk per code + barcode yang bentrok,
+     rencanakan create/update/unchanged, tolak barcode milik produk lain,
+     tulis products + barcodes, tulis auditLogs/{importId}
+  8. lepas kunci (finally)
+```
+
+> Batas 100 baris per kiriman berasal dari batas ~500 dokumen/transaksi
+> Firestore (1 baris = 1 produk + minimal 1 barcode). File 5.000 baris
+> dipecah klien menjadi beberapa batch. Replay file yang sama menghasilkan
+> `0 perubahan` karena `importId` sama.
 
 ---
 

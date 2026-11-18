@@ -87,7 +87,7 @@ test('format salah dikumpulkan semuanya, bukan berhenti di yang pertama', () => 
     [
       row({
         code: 'X',
-        name: '=EVIL()',
+        name: '=A',
         type: 'unknown',
         uom: 'drum',
         barcodes: ['AB'],

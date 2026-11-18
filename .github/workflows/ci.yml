@@ -101,6 +101,10 @@ jobs:
             if [ -f android/app/build.gradle.kts ]; then
               sed -i 's/compileSdk = flutter.compileSdkVersion/compileSdk = 36/' android/app/build.gradle.kts
               sed -i 's/ndkVersion = flutter.ndkVersion/ndkVersion = "27.0.12077973"/' android/app/build.gradle.kts
+              # androidx.camera 1.6.x (dipakai mobile_scanner) menuntut AGP 8.9.1.
+              # Gradle 8.12 dari template Flutter 3.32.5 sudah memenuhi syarat.
+              sed -i 's/id("com.android.application") version "[0-9.]*"/id("com.android.application") version "8.9.1"/' android/settings.gradle.kts
+              grep -n 'com.android.application' android/settings.gradle.kts
             fi
             grep -Rn "minSdk\|compileSdk\|ndkVersion" android/app/build.gradle* | head -8
           fi

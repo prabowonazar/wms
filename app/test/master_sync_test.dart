@@ -241,6 +241,24 @@ void main() {
     expect(await database.query('products'), hasLength(1));
   });
 
+  test('resync gagal di halaman pertama tidak menghapus mirror lama', () async {
+    // Isi mirror lebih dulu lewat sync yang sukses.
+    final seedRemote = FakeMasterRemote(
+      (_) async => page([product('p1', barcodes: ['AAA'])]),
+    );
+    await serviceWith(seedRemote).syncIfNeeded();
+    expect(await database.query('products'), hasLength(1));
+
+    final offline = FakeMasterRemote(
+      (_) async => throw StateError('tidak ada jaringan'),
+    );
+    await expectLater(serviceWith(offline).resyncAll(), throwsStateError);
+
+    // Penghapusan baru terjadi setelah halaman pertama berhasil diambil.
+    expect(await database.query('products'), hasLength(1));
+    expect(await database.query('product_barcodes'), hasLength(1));
+  });
+
   test('resyncAll mengosongkan produk yang sudah tidak ada di server', () async {
     var version = 0;
     final remote = FakeMasterRemote(

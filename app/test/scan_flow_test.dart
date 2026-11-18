@@ -65,6 +65,21 @@ Future<void> seedProduct(
   }
 }
 
+/// Menandai master baru saja disinkronkan agar `initState` tidak memicu full
+/// sync yang (secara desain) mengganti seluruh mirror lokal.
+Future<void> markMasterFresh(Database database) async {
+  final now = DateTime.now();
+  await database.insert(
+    'meta',
+    {
+      'key': MasterSyncService.lastSyncKey,
+      'value': '${now.toUtc().millisecondsSinceEpoch}',
+      'updated_at': now.millisecondsSinceEpoch,
+    },
+    conflictAlgorithm: ConflictAlgorithm.replace,
+  );
+}
+
 void main() {
   late Database database;
 
@@ -106,6 +121,7 @@ void main() {
     tester,
   ) async {
     await seedProduct(database);
+    await markMasterFresh(database);
     await tester.pumpWidget(buildScanScreen());
     await tester.pumpAndSettle();
 
@@ -121,21 +137,51 @@ void main() {
     tester,
   ) async {
     await seedProduct(database);
-    await tester.pumpWidget(buildScanScreen());
+    await markMasterFresh(database);
+    await tester.pumpWidget(
+      MaterialApp(
+        home: ScanScreen(
+          database: database,
+          products: ProductRepository(
+            database: database,
+            warehouseId: 'JKT-01',
+          ),
+          sync: MasterSyncService(
+            database: database,
+            remote: EmptyRemote(),
+            warehouseId: 'JKT-01',
+          ),
+          telemetry: const NoopTelemetry(),
+          profile: profile,
+          onSignOut: () async {},
+          scannerBuilder: (context, onCode) => Center(
+            child: ElevatedButton(
+              // Dua deteksi dalam satu frame, seperti kamera yang membaca
+              // barcode yang sama dua kali sebelum lembar terbuka.
+              onPressed: () {
+                onCode('899123');
+                onCode('899123');
+              },
+              child: const Text('emit'),
+            ),
+          ),
+        ),
+      ),
+    );
     await tester.pumpAndSettle();
 
-    await tester.tap(find.text('emit'));
-    await tester.pump();
     await tester.tap(find.text('emit'));
     await tester.pumpAndSettle();
 
     expect(find.text('Saldo saat ini'), findsOneWidget);
+    expect(find.text('Sarung Tangan Nitril'), findsOneWidget);
   });
 
   testWidgets('barcode asing membuka SCR-06 dan laporan tersimpan lokal', (
     tester,
   ) async {
     await seedProduct(database);
+    await markMasterFresh(database);
     await tester.pumpWidget(
       MaterialApp(
         home: ScanScreen(
@@ -181,6 +227,7 @@ void main() {
     tester,
   ) async {
     await seedProduct(database, active: false);
+    await markMasterFresh(database);
     await tester.pumpWidget(buildScanScreen());
     await tester.pumpAndSettle();
 

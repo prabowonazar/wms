@@ -156,6 +156,23 @@ graph LR
 
 **Exit (G1):** 2 device, 2.000 SKU, lookup & scan memenuhi NFR saat offline; master bisa diperbarui admin end-to-end.
 
+**Status implementasi (18 Nov 2026):**
+
+| Tiket | Kode | CI | Device |
+|---|---|---|---|
+| VS1-01 | `MasterSyncService` + `FirestoreMasterRemote` | unit test lulus | **belum** (butuh project dev) |
+| VS1-02 | `ScannerPanel` + `ScanScreen` (debounce 800 ms, izin + tombol setelan) | widget test lulus | **belum** (butuh kamera) |
+| VS1-03 | `ProductRepository.findByBarcode` + SCR-06 | unit/widget test lulus | **belum** |
+| VS1-04 | `SearchScreen` + input manual | widget test lulus | **belum** |
+| VS1-05 | `isMasterStale` + banner | unit/widget test lulus | **belum** |
+| VS1-06 | callable `importProducts` + rules `importLocks` | Functions & rules test lulus | **belum** (butuh admin nyata) |
+| VS1-07 | event `scan_completed` (`duration_ms`, `result`) | kode ada, belum ada data | **belum** |
+
+> Bukti perangkat dan angka NFR (lookup p95 ≤50 ms, scan→tampil ≤300 ms,
+> 2.000 SKU ≤60 s) **belum diukur** karena mesin ini tidak punya device,
+> Flutter, atau project Firebase dev. Semua test di atas bukti logika, bukan
+> bukti AC.
+
 ---
 
 ### VS-2 — Core loop: transaksi offline → sync → saldo

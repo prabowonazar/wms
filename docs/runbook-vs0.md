@@ -31,8 +31,10 @@
 | Kunci DB | `app/lib/core/security/db_key_store.dart` | 32 byte acak -> base64Url -> `flutter_secure_storage` |
 | Layar | `app/lib/features/**` | Login, akun ditolak, beranda per role, pengaturan, config hilang, bootstrap gagal |
 | Test | `app/test/**` | SQL splitter, skema via FFI, profil, role policy, widget config |
-| Functions | `firebase/functions/**` | `health` callable + unit test murni |
-| Rules test | `firebase/test/**` | 33 kasus izin/tolak di emulator |
+| Functions | `firebase/functions/**` | `health` + `importProducts` callable, validasi murni di `lib/` |
+| Rules test | `firebase/test/**` | 35 kasus izin/tolak di emulator |
+| Master (VS-1) | `app/lib/core/master/**` | Model produk, sync full/delta, lookup & pencarian lokal |
+| Scan (VS-1) | `app/lib/features/scan/**`, `features/home/settings_sheet.dart` | SCR-03/06/07, debounce 800 ms, banner master, pengaturan |
 | CI | `.github/workflows/ci.yml` | analyze/test/APK, Functions, rules emulator |
 | Verifikasi | `tools/verify-vs0.ps1` | Pemeriksaan statis + opsi `-RunTests` |
 | Verifikasi skema | `tools/verify-schema-sqlite.ps1` | Menjalankan `sqlite_schema.sql` di SQLite 3.43.2 nyata (Windows, tanpa toolchain) |
@@ -527,3 +529,58 @@ Riwayat CI (semua kegagalan sudah diperbaiki dan dibuktikan ulang):
 - [ ] Tidak ada kredensial di repo (`verify-vs0.ps1` + review manual).
 
 Setelah semua tercentang, baru lanjut ke **VS-1: scan & master data offline**.
+
+---
+
+## 14. Demo VS-1 (scan & master data offline)
+
+Prasyarat: VS-0 §3–§8 selesai (Android di-generate, Firebase dev siap, login
+jalan) dan `flutter pub get` sudah mengambil `mobile_scanner` + `app_settings`.
+
+### 14.1 Siapkan master di Firestore
+
+Pilih salah satu:
+
+1. **Lewat emulator + callable** (tanpa sheet):
+   ```powershell
+   cd firebase
+   firebase emulators:start --only firestore,functions,auth
+   # panggil importProducts dengan token admin (Postman/curl ke emulator)
+   ```
+   Body: `{"data":{"warehouseId":"JKT-01","rows":[{...}]}}` maksimum 100 baris.
+2. **Lewat sheet**: jalankan `apps-script/Code.gs` (lihat `apps-script/README.md`),
+   ekspor CSV bersih, lalu kirim barisnya ke `importProducts` per batch 100.
+
+Setelah impor, login sebagai operator gudang yang sama dan tekan
+**Pengaturan → Sinkronkan sekarang** (atau tunggu auto-sync saat buka app).
+
+### 14.2 Demo offline (bukti AC inti)
+
+1. Aktifkan **airplane mode**.
+2. Scan 10 produk nyata → nama, UoM, dan saldo tampil; catat waktu
+   scan→lembar terbuka (target ≤300 ms).
+3. Scan barcode yang sama dua kali cepat → hanya satu lembar terbuka
+   (debounce 800 ms).
+4. Scan barcode asing → **SCR-06**, ketuk **Lapor admin** → laporan masuk
+   `error_log` lokal (cek dengan `adb shell` bila perlu).
+5. Ketuk **Input manual**, cari 3 huruf → hasil muncul; masukkan kode persis
+   → lembar produk terbuka.
+6. Ubah jam perangkat >24 jam ke depan (atau hapus `meta.last_master_sync_at`
+   lewat DB debug) → banner **Master produk … jam lalu** muncul; sync sukses
+   menghilangkan banner.
+7. Tolak izin kamera saat pertama scan → panel penjelasan + **Buka setelan**
+   (bukan layar kosong).
+
+### 14.3 Bukti yang perlu dicatat
+
+| Bukti | Cara |
+|---|---|
+| `master_sync_completed` | Analytics DebugView: `products`, `pages`, `duration_ms` |
+| `scan_completed` | DebugView: `duration_ms`, `result` (`found`/`unknown`/`inactive`) |
+| Lookup p95 ≤50 ms | ukur dari log `scan_completed` setelah ≥100 scan |
+| 2.000 SKU ≤60 s | catat `duration_ms` sync penuh pertama |
+| Idempotensi impor | kirim file sama 2× → hasil kedua `skipped`, `created=0` |
+
+Catatan: pengukuran NFR **belum** dilakukan di mesin ini (tanpa device dan
+project dev). Angka di atas harus diisi dari demo nyata.
+

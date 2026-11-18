@@ -83,20 +83,6 @@ class MasterSyncService {
   Future<MasterSyncResult> sync({bool full = false}) async {
     final stopwatch = Stopwatch()..start();
 
-    if (full) {
-      await _database.transaction((txn) async {
-        // Urutan eksplisit: barcode lebih dulu agar tidak bergantung pada
-        // ON DELETE CASCADE saat tabel produk dikosongkan.
-        await txn.delete('product_barcodes');
-        await txn.delete('products');
-        await txn.delete(
-          'meta',
-          where: 'key = ?',
-          whereArgs: [lastSyncKey],
-        );
-      });
-    }
-
     var cursor = full ? null : await lastSyncedAt();
     DateTime? newest = cursor;
     var productCount = 0;
@@ -111,7 +97,26 @@ class MasterSyncService {
         );
         pages++;
 
-        if (page.products.isNotEmpty) {
+        // Full sync mengganti seluruh mirror lokal, tetapi penghapusan baru
+        // dilakukan setelah halaman pertama berhasil diambil. Kalau jaringan
+        // mati di awal, data lama tetap utuh dan operator masih bisa scan.
+        if (full && pages == 1) {
+          await _database.transaction((txn) async {
+            // Urutan eksplisit: barcode lebih dulu agar tidak bergantung pada
+            // ON DELETE CASCADE saat tabel produk dikosongkan.
+            await txn.delete('product_barcodes');
+            await txn.delete('products');
+            await txn.delete(
+              'meta',
+              where: 'key = ?',
+              whereArgs: [lastSyncKey],
+            );
+            for (final product in page.products) {
+              await _upsertProduct(txn, product);
+            }
+          });
+          productCount += page.products.length;
+        } else if (page.products.isNotEmpty) {
           await _database.transaction((txn) async {
             for (final product in page.products) {
               await _upsertProduct(txn, product);
