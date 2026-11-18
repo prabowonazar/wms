@@ -9,6 +9,7 @@ import '../core/auth/auth_repository.dart';
 import '../core/auth/google_sign_in_adapter.dart';
 import '../core/config/app_config.dart';
 import '../core/db/app_database.dart';
+import '../core/master/master_remote.dart';
 import '../core/observability/telemetry.dart';
 import '../core/security/db_key_store.dart';
 import '../core/storage/profile_cache.dart';
@@ -73,6 +74,7 @@ Future<AppServices> bootstrap({Telemetry telemetry = const FirebaseTelemetry()})
     profileCache: profileCache,
     auth: auth,
     telemetry: telemetry,
+    masterRemote: FirestoreMasterRemote(FirebaseFirestore.instance),
   );
 }
 

@@ -10,6 +10,14 @@ class TelemetryEvents {
   static const String loginCancelled = 'login_cancelled';
   static const String dbOpened = 'db_opened';
   static const String dbOpenFailed = 'db_open_failed';
+
+  /// VS1-01/VS1-07: hasil sinkronisasi master produk.
+  static const String masterSyncCompleted = 'master_sync_completed';
+  static const String masterSyncFailed = 'master_sync_failed';
+
+  /// VS1-07: durasi `scan_start -> product_shown` beserta hasilnya.
+  static const String scanCompleted = 'scan_completed';
+  static const String unknownBarcodeReported = 'unknown_barcode_reported';
 }
 
 /// Titik masuk tunggal untuk analytics & crash reporting.
