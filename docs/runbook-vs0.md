@@ -437,7 +437,7 @@ Jangan commit: `dart_defines/`, `google-services.json`, service account, `*.jks`
 
 ---
 
-## 10. Status verifikasi (jujur)
+## 10. Status verifikasi (jujur, VS-0 + VS-1)
 
 | Hal | Status |
 |---|---|
@@ -451,22 +451,23 @@ Jangan commit: `dart_defines/`, `google-services.json`, service account, `*.jks`
 | Skrip ASCII | Ya |
 | `flutter pub get` | **Lolos di CI** (Flutter 3.32.5; `sqflite_sqlcipher` dipin 3.3.0) |
 | `flutter analyze` | **Bersih di CI** - `No issues found!` |
-| `flutter test` | **36 test lolos di CI** (termasuk FFI Schema dan widget test) |
-| Build APK Android | **Lolos di CI** sebagai smoke build (Android di-scaffold, minSdk 26); bukan bukti konfigurasi final |
-| Rules test emulator | **33 kasus lolos di CI** (target minimal 12) |
-| Functions unit test | **3 test lolos di CI** |
-| Versi paket terkunci (`pubspec.lock`) | Diambil dari artifact CI lalu di-commit (75 paket) |
+| `flutter test` | **60 test lolos di CI** (termasuk 8 test sync master, 8 lookup/pencarian, 8 widget scan, FFI Schema) |
+| Build APK Android | **Lolos di CI** sebagai smoke build (Android di-scaffold, minSdk 26, compileSdk 36, NDK 27); bukan bukti konfigurasi final |
+| Rules test emulator | **35 kasus lolos di CI** (target minimal 12) |
+| Functions unit test | **12 test lolos di CI** (3 `health`, 9 validasi impor) |
+| Versi paket terkunci (`pubspec.lock`) | Diambil dari artifact CI lalu di-commit (77 paket) |
 | Login Google nyata di device | **Belum dijalankan** (butuh project dev + SHA-1) |
 | SQLCipher di device | **Belum dibuktikan** (baru desain + test non-enkripsi via FFI) |
 | Crashlytics & Analytics | **Belum dibuktikan** |
+| Scan kamera, debounce, banner offline (VS-1) | **Belum dibuktikan di device**; baru widget test dengan scanner palsu |
+| Angka NFR VS-1 (lookup p95 ≤50 ms, scan→tampil ≤300 ms, 2.000 SKU ≤60 s) | **Belum diukur** |
 
-Bukti CI terakhir: run #7 (`d641019`) keempat job hijau, setelah `pubspec.lock`
-di-commit. Detail per job:
+Bukti CI terakhir: run #12 (`d08e373`) keempat job hijau. Detail per job:
 
-- `Flutter analyze & test`: `No issues found!` + 36 test lulus, coverage terunggah.
+- `Flutter analyze & test`: `No issues found!` + 60 test lulus, coverage terunggah.
 - `Build debug APK`: `app-debug.apk` terbangun dan terunggah sebagai artifact.
-- `Firestore rules test`: `# pass 33`, `# fail 0`.
-- `Functions syntax & unit test`: `# pass 3`, `# fail 0`.
+- `Firestore rules test`: 35 kasus lulus.
+- `Functions syntax & unit test`: 12 test lulus.
 
 Riwayat CI (semua kegagalan sudah diperbaiki dan dibuktikan ulang):
 
@@ -477,6 +478,11 @@ Riwayat CI (semua kegagalan sudah diperbaiki dan dibuktikan ulang):
 | #3 | gagal | build APK: `minSdk 21` < 23 yang dituntut `firebase-auth` |
 | #4 | **hijau** | bukti pertama: analyze bersih, 36 test, APK, rules 33, Functions 3 |
 | #7 | **hijau** | dengan `pubspec.lock` ter-commit |
+| #8 | **hijau** | dokumen bukti run #7 |
+| #9 | gagal | `app_settings` belum di pubspec; `BuildContext` hilang di `settings_sheet`; APK butuh compileSdk 36/NDK 27 |
+| #10 | gagal | widget test scan terhapus oleh full sync di `initState`; AGP scaffold < 8.9.1; nama test Functions tidak memicu aturan yang diuji |
+| #11 | **hijau** | full sync non-destruktif (hapus mirror setelah halaman pertama), AGP 8.9.1, 60 test |
+| #12 | **hijau** | kuota impor per file (`fileId` + `batchIndex`), 12 test Functions |
 
 ---
 
@@ -522,7 +528,7 @@ Riwayat CI (semua kegagalan sudah diperbaiki dan dibuktikan ulang):
 - [ ] APK dipasang di 2 device fisik; login 3 role berhasil.
 - [ ] Akun `active=false` menampilkan SCR-02, bukan crash.
 - [ ] Tutup-buka app tetap login tanpa dialog Google.
-- [ ] Rules test >= 12 kasus hijau di emulator (target aktual 33).
+- [ ] Rules test >= 12 kasus hijau di emulator (target aktual 35).
 - [ ] File DB tidak bisa dibaca tanpa kunci (dibuktikan dengan `Format-Hex`).
 - [ ] Crash uji muncul di Crashlytics; `app_open` & `login_success` tercatat.
 - [ ] `docs/` diperbarui bila ada perilaku yang berubah.

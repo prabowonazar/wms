@@ -6,16 +6,19 @@ sekali. Proyek ini dibangun bertahap lewat 7 vertical slice (VS-0..VS-6).
 
 ## Status
 
-**VS-0 (fondasi) - scaffold selesai dan CI hijau; belum diverifikasi di device.**
+**VS-0 (fondasi) dan VS-1 (scan & master data offline) - kode selesai dan CI
+hijau; belum diverifikasi di device.**
 
 Yang sudah ada: login Google + role gate, database SQLCipher, skema v1, rules
-Firestore + 33 test rules, Cloud Functions `health`, CI, dan runbook.
+Firestore + 35 test rules, Cloud Functions `health` dan `importProducts` + 12
+test, sync master full/delta, layar scan + pencarian lokal, CI, dan runbook.
 
 > Mesin ini tidak punya Flutter/Dart/Node/Java, jadi seluruh bukti kompilasi
-> datang dari CI GitHub Actions (run #7, commit `d641019`): `flutter analyze`
-> bersih, 36 test Flutter lulus, APK debug terbangun, 33 test rules dan 3 test
+> datang dari CI GitHub Actions (run #12, commit `d08e373`): `flutter analyze`
+> bersih, 60 test Flutter lulus, APK debug terbangun, 35 test rules dan 12 test
 > Functions lulus. Yang masih terbuka hanya bukti di device: login Google nyata,
-> SQLCipher terenkripsi, Crashlytics, dan Analytics.
+> kamera & debounce di perangkat, SQLCipher terenkripsi, Crashlytics, Analytics,
+> serta angka NFR (lookup p95, scan→tampil, sync 2.000 SKU).
 
 ## Mulai cepat
 
@@ -44,7 +47,8 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\verify-vs0.ps1 -RunT
 ```
 app/                 Flutter app (lib, test, sqlite_schema.sql, pubspec)
   lib/core/          config, sql, db, security, auth, storage, observability
-  lib/features/      login, denied, home, splash, bootstrap
+  lib/core/master/   model produk, sync full/delta, lookup & pencarian lokal
+  lib/features/      login, denied, home, splash, bootstrap, scan
   test/              test unit, FFI SQLite, widget
 firebase/            rules, indexes, firebase.json, functions/, test/
 docs/                PRD, skema, UX, spike, backlog slice, runbook
@@ -64,6 +68,7 @@ Indeks lengkap: [`docs/README.md`](docs/README.md).
 | [`docs/PRD-v2.md`](docs/PRD-v2.md) | Masalah, metrik, RBAC, requirement ber-ID, arsitektur |
 | [`docs/vertical-slice-backlog.md`](docs/vertical-slice-backlog.md) | 7 slice, 47 tiket, gate G0-G6, traceability |
 | [`docs/firestore-schema.md`](docs/firestore-schema.md) | Model Firestore, index, pola tulis |
+| [`docs/product-import-spec.md`](docs/product-import-spec.md) | Aturan impor produk dari sheet + batas batch/kuota |
 | [`docs/ux-flow-spec.md`](docs/ux-flow-spec.md) | 22 layar, 3 alur kritis, copy deck |
 | [`docs/runbook-vs0.md`](docs/runbook-vs0.md) | Cara menjalankan & membuktikan VS-0 |
 
