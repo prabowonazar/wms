@@ -9,6 +9,7 @@ const {
   validateImportRows,
   buildImportId,
   planImport,
+  countBillableImports,
 } = require('./lib/import-products');
 
 initializeApp();
@@ -44,12 +45,16 @@ exports.health = onCall({ region: REGION }, (request) => {
  * Import master produk (VS1-06, FR-MST-04/05, BR-13).
  *
  * Kontrak input:
- *   { warehouseId: 'JKT-01', rows: [{ code, name, type, uom,
+ *   { warehouseId: 'JKT-01',
+ *     fileId?: '<sha256 isi file>',   // opsional, untuk kuota 5 file/jam
+ *     batchIndex?: 0,                 // 0-based, hanya 0 dihitung kuota
+ *     rows: [{ code, name, type, uom,
  *       barcodes: ['...'], minStock, active, note }] }
  *
  * All-or-nothing: seluruh baris divalidasi, lalu ditulis dalam satu
- * transaksi Firestore. Idempotensi memakai `importId` (SHA-256 isi file +
- * gudang) sebagai ID audit log, sehingga kiriman ulang tidak menulis apa pun.
+ * transaksi Firestore. Idempotensi memakai `importId` (SHA-256 fileId + isi
+ * batch + gudang) sebagai ID audit log, sehingga kiriman ulang tidak menulis
+ * apa pun.
  */
 exports.importProducts = onCall(
   { region: REGION, timeoutSeconds: 120 },
@@ -90,11 +95,22 @@ exports.importProducts = onCall(
       });
     }
 
-    await enforceHourlyLimit(uid);
+    const fileId =
+      typeof data.fileId === 'string' ? data.fileId.trim() : '';
+    const batchIndex = Number.isInteger(data.batchIndex)
+      ? data.batchIndex
+      : 0;
+    if (batchIndex < 0) {
+      throw new HttpsError(
+        'invalid-argument',
+        'batchIndex harus bilangan bulat >= 0.',
+      );
+    }
 
     const importId = buildImportId({
       rows: validation.rows,
       warehouseId,
+      fileId,
     });
     const auditRef = db.doc(`auditLogs/${importId}`);
     if ((await auditRef.get()).exists) {
@@ -107,12 +123,18 @@ exports.importProducts = onCall(
       };
     }
 
+    // Duplikat diperiksa sebelum batas per jam supaya retry batch yang sama
+    // tidak menghabiskan kuota.
+    await enforceHourlyLimit(uid);
+
     await acquireImportLock({ warehouseId, importId, uid });
     try {
       const result = await applyImport({
         rows: validation.rows,
         warehouseId,
         importId,
+        fileId,
+        batchIndex,
         uid,
         auditRef,
       });
@@ -142,10 +164,13 @@ async function enforceHourlyLimit(uid) {
     // yang sudah ada di firestore.indexes.json.
     .orderBy('at', 'descending')
     .get();
-  if (recent.size >= MAX_IMPORTS_PER_HOUR) {
+  // Satu file 5.000 baris dikirim sebagai 50 batch; hanya batch pertama
+  // (batchIndex 0) yang dihitung agar batas "5 file per jam" tetap berlaku.
+  const files = countBillableImports(recent.docs.map((doc) => doc.data()));
+  if (files >= MAX_IMPORTS_PER_HOUR) {
     throw new HttpsError(
       'resource-exhausted',
-      `Batas ${MAX_IMPORTS_PER_HOUR} impor per jam tercapai. Coba lagi nanti.`,
+      `Batas ${MAX_IMPORTS_PER_HOUR} impor file per jam tercapai. Coba lagi nanti.`,
     );
   }
 }
@@ -186,7 +211,15 @@ async function releaseImportLock(warehouseId, importId) {
   });
 }
 
-async function applyImport({ rows, warehouseId, importId, uid, auditRef }) {
+async function applyImport({
+  rows,
+  warehouseId,
+  importId,
+  fileId,
+  batchIndex,
+  uid,
+  auditRef,
+}) {
   const now = FieldValue.serverTimestamp();
 
   return db.runTransaction(async (txn) => {
@@ -274,7 +307,10 @@ async function applyImport({ rows, warehouseId, importId, uid, auditRef }) {
       actorUid: uid,
       entity: 'products',
       entityId: warehouseId,
-      reason: `Impor ${rows.length} baris untuk ${warehouseId}`,
+      fileId,
+      batchIndex,
+      reason: `Impor ${rows.length} baris untuk ${warehouseId}` +
+        (fileId ? ` (file ${fileId.slice(0, 8)}, batch ${batchIndex})` : ''),
       before: null,
       after: {
         created: plan.creates.length,

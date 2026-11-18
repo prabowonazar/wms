@@ -257,10 +257,11 @@ function validateImportRows(rows, warehouseId) {
 }
 
 /** `importId` stabil untuk idempotensi (spec 6.3). */
-function buildImportId({ rows, warehouseId, schemaVersion = 1 }) {
+function buildImportId({ rows, warehouseId, schemaVersion = 1, fileId = '' }) {
   const canonical = JSON.stringify({
     schemaVersion,
     warehouseId,
+    fileId: typeof fileId === 'string' ? fileId : '',
     rows: rows.map((row) => ({
       code: row.code,
       name: row.name,
@@ -365,6 +366,26 @@ function planImport({ rows, existingByCode, barcodeOwners }) {
   };
 }
 
+/**
+ * Menghitung "file" yang memakai kuota impor per jam.
+ *
+ * Hanya audit log `product.import` yang dihitung. Satu file besar dikirim
+ * sebagai banyak batch; hanya batch pertama (`batchIndex` 0 atau tidak diisi)
+ * yang dihitung agar batas 5 file/jam tidak habis oleh 50 batch dari satu file.
+ */
+function countBillableImports(auditEntries) {
+  let files = 0;
+  for (const entry of auditEntries) {
+    if (!entry || entry.action !== 'product.import') {
+      continue;
+    }
+    if ((entry.batchIndex || 0) === 0) {
+      files += 1;
+    }
+  }
+  return files;
+}
+
 module.exports = {
   PRODUCT_TYPES,
   UOMS,
@@ -374,4 +395,5 @@ module.exports = {
   validateImportRows,
   buildImportId,
   planImport,
+  countBillableImports,
 };

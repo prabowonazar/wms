@@ -162,28 +162,47 @@ Semua baris divalidasi; **semua kesalahan dikumpulkan**, bukan berhenti di yang 
 
 ### 6.3 Idempotensi
 
-- `importId = SHA-256(isi file + kode_gudang + schemaVersion)`.
+- `importId = SHA-256(fileId + isi batch + kode_gudang + schemaVersion)`.
+- `fileId = SHA-256(seluruh isi file)`; `batchIndex` 0-based untuk file besar.
 - File yang sama diimpor dua kali → hasil kedua **0 perubahan**, tercatat `skipped (duplicate)`.
 - Update dengan isi identik → tidak menulis ulang dokumen (hindari biaya & version churn).
 
+### 6.3a Batas kiriman (implementasi MVP)
+
+Firestore membatasi sekitar 500 dokumen per transaksi, sedangkan satu baris
+memakai 1 dokumen produk + minimal 1 dokumen barcode. Karena itu:
+
+- Satu panggilan `importProducts` maksimum **100 baris** (`E-IMPORT-BATCH`).
+- File 5.000 baris dipecah klien menjadi 50 panggilan dengan `fileId` sama dan
+  `batchIndex` 0..49.
+- **All-or-nothing berlaku per kiriman**, bukan per file. Bila batch ke-7 gagal,
+  batch 1–6 tetap tersimpan; kirim ulang batch yang gagal (idempoten, tidak
+  menggandakan data). Ini keterbatasan MVP yang harus disebut di demo.
+- `importId` menyertakan `fileId`, jadi dua file berbeda dengan isi batch identik
+  tetap dianggap impor berbeda.
+
 ### 6.4 Audit
 
-Setiap impor membuat satu dokumen `auditLogs`:
+Setiap kiriman membuat satu dokumen `auditLogs`:
 
 | Field | Isi |
 |---|---|
 | `action` | `product.import` |
 | `actorUid` | Admin yang menjalankan |
-| `reason` | Nama file + jumlah baris |
-| `before` / `after` | Ringkasan: `{created, updated, unchanged, skipped}` |
+| `entityId` | Kode gudang |
+| `fileId` / `batchIndex` | Identitas file dan urutan batch |
+| `reason` | Jumlah baris + potongan `fileId` + batch |
+| `before` / `after` | Ringkasan: `{created, updated, unchanged, deletedBarcodes}` |
 | `at` | Timestamp server |
 
 Perubahan per produk (nama, status, barcode) dicatat dengan nilai sebelum/sesudah.
 
 ### 6.5 Kunci konkurensi
 
-- Hanya **satu impor aktif per gudang**. Jika ada impor berjalan, permintaan kedua ditolak dengan `E-IMPORT-LOCKED`.
-- Batas 5 impor per jam per admin untuk mencegah loop.
+- Hanya **satu impor aktif per gudang**. Kunci `importLocks/{warehouseId}`
+  berlaku 5 menit; permintaan kedua ditolak dengan `E-IMPORT-LOCKED`.
+- Batas **5 file per jam per admin**. Hanya `batchIndex = 0` yang dihitung,
+  sehingga satu file 50 batch tidak menghabiskan kuota.
 
 ---
 
@@ -195,7 +214,7 @@ stateDiagram-v2
     Diunggah --> Divalidasi: parse + cek aturan
     Divalidasi --> Ditolak: ada error
     Divalidasi --> Siap: 0 error
-    Siap --> Diterapkan: commit batch 500
+    Siap --> Diterapkan: commit per batch <=100 baris
     Diterapkan --> Tersinkron: device delta sync
     Ditolak --> [*]: unduh laporan
     Tersinkron --> [*]

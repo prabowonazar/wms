@@ -465,12 +465,12 @@ App: query products where warehouseIds array-contains wid and updatedAt > lastSy
 ### 5.7 Import produk dari sheet (callable `importProducts`)
 
 ```
-Admin (app/Apps Script) → callable importProducts { warehouseId, rows[<=100] }
+Admin (app/Apps Script) → callable importProducts { warehouseId, fileId, batchIndex, rows[<=100] }
   1. verifikasi users/{uid}.role == 'admin' && active == true
-  2. validasi seluruh baris (all-or-nothing, BR-13)
-  3. importId = SHA-256(baris kanonik + warehouseId + schemaVersion)
+  2. validasi seluruh baris (all-or-nothing per kiriman, BR-13)
+  3. importId = SHA-256(fileId + baris kanonik + warehouseId + schemaVersion)
   4. auditLogs/{importId} sudah ada? → status 'skipped', 0 tulisan
-  5. batas 5 impor/jam per admin (auditLogs actorUid + at)
+  5. batas 5 file/jam per admin (hanya batchIndex 0 yang dihitung)
   6. ambil kunci importLocks/{warehouseId} (TTL 5 menit)
   7. satu transaksi Firestore: baca produk per code + barcode yang bentrok,
      rencanakan create/update/unchanged, tolak barcode milik produk lain,
@@ -480,8 +480,10 @@ Admin (app/Apps Script) → callable importProducts { warehouseId, rows[<=100] }
 
 > Batas 100 baris per kiriman berasal dari batas ~500 dokumen/transaksi
 > Firestore (1 baris = 1 produk + minimal 1 barcode). File 5.000 baris
-> dipecah klien menjadi beberapa batch. Replay file yang sama menghasilkan
-> `0 perubahan` karena `importId` sama.
+> dipecah klien menjadi 50 batch dengan `fileId` sama dan `batchIndex`
+> 0..49. Replay batch yang sama menghasilkan `0 perubahan` karena
+> `importId` sama. All-or-nothing berlaku per batch, bukan per file — lihat
+> [`product-import-spec.md`](product-import-spec.md) §6.3a.
 
 ---
 

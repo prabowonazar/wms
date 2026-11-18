@@ -7,6 +7,7 @@ const {
   validateImportRows,
   buildImportId,
   planImport,
+  countBillableImports,
   MAX_ROWS,
 } = require('../lib/import-products');
 
@@ -148,10 +149,31 @@ test('importId stabil dan berbeda antar gudang', () => {
     rows: valid.rows,
     warehouseId: 'JKT-02',
   });
+  const otherFile = buildImportId({
+    rows: valid.rows,
+    warehouseId: 'JKT-01',
+    fileId: 'file-b',
+  });
 
   assert.equal(first, second);
   assert.notEqual(first, otherWarehouse);
+  assert.notEqual(first, otherFile);
   assert.match(first, /^[a-f0-9]{64}$/);
+});
+
+test('satu file 50 batch hanya memakai satu kuota impor per jam', () => {
+  const entries = [];
+  for (let batch = 0; batch < 50; batch += 1) {
+    entries.push({ action: 'product.import', batchIndex: batch });
+  }
+  // Dokumen lama tanpa batchIndex tetap dihitung satu file.
+  entries.push({ action: 'product.import' });
+  // Audit log aksi lain tidak memakai kuota impor.
+  entries.push({ action: 'user.update' });
+  entries.push(null);
+
+  assert.equal(countBillableImports(entries), 2);
+  assert.equal(countBillableImports([]), 0);
 });
 
 test('planImport: create, update, unchanged, dan barcode dilepas', () => {
