@@ -274,6 +274,22 @@ describe('master produk & saldo', () => {
       }),
     );
   });
+
+  it('admin pun tidak bisa menulis importLocks (Function only)', async () => {
+    const db = authedDb('adm1');
+    await assertFails(
+      setDoc(doc(db, 'importLocks/wh1'), {
+        owner: 'abc',
+        actorUid: 'adm1',
+        expiresAt: Timestamp.fromMillis(Date.now() + 60000),
+      }),
+    );
+    await assertFails(getDoc(doc(db, 'importLocks/wh1')));
+  });
+
+  it('operator tidak bisa membaca importLocks', async () => {
+    await assertFails(getDoc(doc(authedDb('op1'), 'importLocks/wh1')));
+  });
 });
 
 describe('transaksi ledger', () => {

@@ -2,16 +2,35 @@
 
 const { onCall, HttpsError } = require('firebase-functions/v2/https');
 const { initializeApp } = require('firebase-admin/app');
+const { getFirestore, FieldValue } = require('firebase-admin/firestore');
 
 const { buildHealthPayload } = require('./lib/health');
+const {
+  validateImportRows,
+  buildImportId,
+  planImport,
+} = require('./lib/import-products');
 
 initializeApp();
+
+const REGION = 'asia-southeast2';
+const db = getFirestore();
+
+const IMPORT_LOCK_TTL_MS = 5 * 60 * 1000;
+const MAX_IMPORTS_PER_HOUR = 5;
+
+class ImportConflictError extends Error {
+  constructor(errors) {
+    super('Barcode sudah dimiliki produk lain.');
+    this.details = errors;
+  }
+}
 
 /**
  * Endpoint diagnostik: memastikan Functions v2 bisa dipanggil dengan token
  * pengguna. Tidak menyentuh Firestore, jadi aman dipanggil kapan saja.
  */
-exports.health = onCall({ region: 'asia-southeast2' }, (request) => {
+exports.health = onCall({ region: REGION }, (request) => {
   if (!request.auth) {
     throw new HttpsError('unauthenticated', 'Butuh login.');
   }
@@ -20,3 +39,287 @@ exports.health = onCall({ region: 'asia-southeast2' }, (request) => {
     now: new Date(),
   });
 });
+
+/**
+ * Import master produk (VS1-06, FR-MST-04/05, BR-13).
+ *
+ * Kontrak input:
+ *   { warehouseId: 'JKT-01', rows: [{ code, name, type, uom,
+ *       barcodes: ['...'], minStock, active, note }] }
+ *
+ * All-or-nothing: seluruh baris divalidasi, lalu ditulis dalam satu
+ * transaksi Firestore. Idempotensi memakai `importId` (SHA-256 isi file +
+ * gudang) sebagai ID audit log, sehingga kiriman ulang tidak menulis apa pun.
+ */
+exports.importProducts = onCall(
+  { region: REGION, timeoutSeconds: 120 },
+  async (request) => {
+    const uid = request.auth && request.auth.uid;
+    if (!uid) {
+      throw new HttpsError('unauthenticated', 'Butuh login.');
+    }
+
+    const data = request.data || {};
+    const warehouseId =
+      typeof data.warehouseId === 'string'
+        ? data.warehouseId.trim().toUpperCase()
+        : '';
+    if (warehouseId === '') {
+      throw new HttpsError('invalid-argument', 'warehouseId wajib diisi.');
+    }
+
+    const userSnapshot = await db.doc(`users/${uid}`).get();
+    const user = userSnapshot.data();
+    if (
+      !userSnapshot.exists ||
+      !user ||
+      user.role !== 'admin' ||
+      user.active !== true
+    ) {
+      throw new HttpsError(
+        'permission-denied',
+        'Hanya admin aktif yang boleh mengimpor produk.',
+      );
+    }
+
+    const validation = validateImportRows(data.rows, warehouseId);
+    if (!validation.ok) {
+      throw new HttpsError('invalid-argument', 'Validasi impor gagal.', {
+        errors: validation.errors,
+        warnings: validation.warnings,
+      });
+    }
+
+    await enforceHourlyLimit(uid);
+
+    const importId = buildImportId({
+      rows: validation.rows,
+      warehouseId,
+    });
+    const auditRef = db.doc(`auditLogs/${importId}`);
+    if ((await auditRef.get()).exists) {
+      return {
+        status: 'skipped',
+        importId,
+        created: 0,
+        updated: 0,
+        unchanged: 0,
+      };
+    }
+
+    await acquireImportLock({ warehouseId, importId, uid });
+    try {
+      const result = await applyImport({
+        rows: validation.rows,
+        warehouseId,
+        importId,
+        uid,
+        auditRef,
+      });
+      return { status: 'applied', importId, ...result };
+    } catch (error) {
+      if (error instanceof ImportConflictError) {
+        throw new HttpsError(
+          'failed-precondition',
+          'Barcode sudah dimiliki produk lain.',
+          { errors: error.details },
+        );
+      }
+      throw error;
+    } finally {
+      await releaseImportLock(warehouseId, importId);
+    }
+  },
+);
+
+async function enforceHourlyLimit(uid) {
+  const since = new Date(Date.now() - 60 * 60 * 1000);
+  const recent = await db
+    .collection('auditLogs')
+    .where('actorUid', '==', uid)
+    .where('at', '>=', since)
+    // Arah DESC agar cocok dengan composite index auditLogs(actorUid, at DESC)
+    // yang sudah ada di firestore.indexes.json.
+    .orderBy('at', 'descending')
+    .get();
+  if (recent.size >= MAX_IMPORTS_PER_HOUR) {
+    throw new HttpsError(
+      'resource-exhausted',
+      `Batas ${MAX_IMPORTS_PER_HOUR} impor per jam tercapai. Coba lagi nanti.`,
+    );
+  }
+}
+
+async function acquireImportLock({ warehouseId, importId, uid }) {
+  const ref = db.doc(`importLocks/${warehouseId}`);
+  await db.runTransaction(async (txn) => {
+    const snapshot = await txn.get(ref);
+    if (snapshot.exists) {
+      const data = snapshot.data();
+      const expiresAt = toMillis(data.expiresAt);
+      if (expiresAt > Date.now() && data.owner !== importId) {
+        throw new HttpsError(
+          'aborted',
+          'Impor lain sedang berjalan untuk gudang ini (E-IMPORT-LOCKED).',
+        );
+      }
+    }
+    txn.set(ref, {
+      owner: importId,
+      actorUid: uid,
+      expiresAt: new Date(Date.now() + IMPORT_LOCK_TTL_MS),
+      updatedAt: FieldValue.serverTimestamp(),
+    });
+  });
+}
+
+async function releaseImportLock(warehouseId, importId) {
+  const ref = db.doc(`importLocks/${warehouseId}`);
+  await db.runTransaction(async (txn) => {
+    const snapshot = await txn.get(ref);
+    if (!snapshot.exists) {
+      return;
+    }
+    if (snapshot.data().owner === importId) {
+      txn.delete(ref);
+    }
+  });
+}
+
+async function applyImport({ rows, warehouseId, importId, uid, auditRef }) {
+  const now = FieldValue.serverTimestamp();
+
+  return db.runTransaction(async (txn) => {
+    const existingByCode = new Map();
+    for (const row of rows) {
+      const snapshot = await txn.get(
+        db.collection('products').where('code', '==', row.code).limit(1),
+      );
+      if (!snapshot.empty) {
+        const doc = snapshot.docs[0];
+        existingByCode.set(row.code, { id: doc.id, ...doc.data() });
+      }
+    }
+
+    const allBarcodes = [...new Set(rows.flatMap((row) => row.barcodes))];
+    const barcodeOwners = {};
+    if (allBarcodes.length > 0) {
+      const refs = allBarcodes.map((barcode) => db.doc(`barcodes/${barcode}`));
+      const snapshots = await txn.getAll(...refs);
+      snapshots.forEach((snapshot, index) => {
+        if (snapshot.exists) {
+          const data = snapshot.data();
+          barcodeOwners[allBarcodes[index]] = {
+            productId: data.productId,
+            productCode: data.productCode,
+          };
+        }
+      });
+    }
+
+    const plan = planImport({ rows, existingByCode, barcodeOwners });
+    if (!plan.ok) {
+      throw new ImportConflictError(plan.errors);
+    }
+
+    const newIds = new Map();
+    for (const row of plan.creates) {
+      const ref = db.collection('products').doc();
+      newIds.set(row.code, ref.id);
+      txn.set(ref, {
+        ...productFields(row, { warehouseIds: [warehouseId], uid, now }),
+        createdAt: now,
+      });
+    }
+
+    for (const update of plan.updates) {
+      const existing = existingByCode.get(update.row.code);
+      const warehouseIds = Array.from(
+        new Set([...(existing.warehouseIds || []), warehouseId]),
+      );
+      txn.set(
+        db.doc(`products/${update.id}`),
+        productFields(update.row, { warehouseIds, uid, now }),
+        // merge agar createdAt dan field lain yang tidak dikelola import tetap.
+        { merge: true },
+      );
+    }
+
+    const updatedRows = [...plan.creates, ...plan.updates.map((item) => item.row)];
+    for (const row of updatedRows) {
+      const productId = existingByCode.has(row.code)
+        ? existingByCode.get(row.code).id
+        : newIds.get(row.code);
+      for (const barcode of row.barcodes) {
+        const isNew = !barcodeOwners[barcode];
+        txn.set(
+          db.doc(`barcodes/${barcode}`),
+          {
+            productId,
+            productCode: row.code,
+            format: 'UNKNOWN',
+            ...(isNew ? { createdAt: now } : {}),
+          },
+          { merge: true },
+        );
+      }
+    }
+
+    for (const barcode of plan.barcodesToDelete) {
+      txn.delete(db.doc(`barcodes/${barcode}`));
+    }
+
+    txn.set(auditRef, {
+      action: 'product.import',
+      actorUid: uid,
+      entity: 'products',
+      entityId: warehouseId,
+      reason: `Impor ${rows.length} baris untuk ${warehouseId}`,
+      before: null,
+      after: {
+        created: plan.creates.length,
+        updated: plan.updates.length,
+        unchanged: plan.unchanged.length,
+        deletedBarcodes: plan.barcodesToDelete.length,
+      },
+      at: now,
+    });
+
+    return {
+      created: plan.creates.length,
+      updated: plan.updates.length,
+      unchanged: plan.unchanged.length,
+      deletedBarcodes: plan.barcodesToDelete.length,
+    };
+  });
+}
+
+function productFields(row, { warehouseIds, uid, now }) {
+  return {
+    code: row.code,
+    name: row.name,
+    type: row.type,
+    uom: row.uom,
+    minStock: row.minStock,
+    note: row.note,
+    barcodes: row.barcodes,
+    active: row.active,
+    warehouseIds,
+    updatedAt: now,
+    updatedBy: uid,
+    schemaVersion: 1,
+  };
+}
+
+function toMillis(value) {
+  if (!value) {
+    return 0;
+  }
+  if (value instanceof Date) {
+    return value.getTime();
+  }
+  if (typeof value.toMillis === 'function') {
+    return value.toMillis();
+  }
+  return 0;
+}

@@ -130,7 +130,7 @@ class _SettingsSheet extends StatelessWidget {
               ),
             const Divider(),
             FilledButton.tonalIcon(
-              onPressed: _confirmSignOut,
+              onPressed: () => _confirmSignOut(context),
               icon: const Icon(Icons.logout),
               label: const Text('Keluar'),
             ),
@@ -140,7 +140,7 @@ class _SettingsSheet extends StatelessWidget {
     );
   }
 
-  Future<void> _confirmSignOut() async {
+  Future<void> _confirmSignOut(BuildContext context) async {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (dialogContext) {

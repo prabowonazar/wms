@@ -23,6 +23,9 @@ dependencies:
   # setelah APK dipasang; ukuran bertambah ~3-10 MB.
   mobile_scanner: ^7.5.0
 
+  # Tombol "Buka setelan" saat izin kamera ditolak (VS1-02).
+  app_settings: ^9.0.1
+
   # Penyimpanan lokal (NFR-SEC-02: SQLCipher, kunci di Keystore)
   # Dipin tepat: 3.4.x menuntut Dart >= 3.9 (Flutter >= 3.35), sedangkan CI
   # memakai Flutter 3.32.5 (Dart 3.8). Pin juga membuat mesin SQLCipher sama
