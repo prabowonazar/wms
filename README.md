@@ -8,22 +8,20 @@ sekali. Proyek ini dibangun bertahap lewat 7 vertical slice (VS-0..VS-6).
 
 **VS-0 (fondasi), VS-1 (scan & master data offline), VS-2 (core loop
 transaksi offline → sync → saldo), dan VS-3 (status sync, retry, konflik,
-histori, reversal) - kode selesai; bukti CI untuk VS-3 sedang dijalankan;
-belum diverifikasi di device.**
+histori, reversal) - kode selesai dan CI hijau; belum diverifikasi di device.**
 
 Yang sudah ada: login Google + role gate (sesi offline maksimal 7 hari),
 database SQLCipher, skema v1, rules Firestore + 41 test rules, Cloud Functions
-`health`, `importProducts`, dan `applyBalance` + 19 test, sync master
+`health`, `importProducts`, dan `applyBalance` + 27 test, sync master
 full/delta, layar scan + pencarian lokal, ledger lokal + outbox idempoten,
 lembar masuk/keluar, saldo & stock card, layar sinkronisasi dengan backoff 5×
 dan penolakan server, deteksi/resolusi konflik saldo, histori berfilter,
 reversal + audit, CI, dan runbook.
 
 > Mesin ini tidak punya Flutter/Dart/Node/Java, jadi seluruh bukti kompilasi
-> datang dari CI GitHub Actions. Untuk VS-2, run #18 (`503465f`) membuktikan
-> `flutter analyze` bersih, 90 test Flutter, APK debug, 37 test rules, dan 22
-> test Functions. VS-3 menambah test/test rules; lihat §10 runbook untuk angka
-> final setelah CI hijau. Yang masih terbuka
+> datang dari CI GitHub Actions (run #24, commit `25898d7`): `flutter analyze`
+> bersih, 105 test Flutter, APK debug terbangun, 41 test rules, dan 27 test
+> Functions lulus. Yang masih terbuka
 > hanya bukti di device: login Google nyata, kamera & debounce, simpan
 > transaksi ≤1,5 s, airplane mode → `synced`, override supervisor, konflik dua
 > device, SQLCipher, Crashlytics, serta angka NFR. Outbox masih memakai timer

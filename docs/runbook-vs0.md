@@ -464,11 +464,11 @@ Jangan commit: `dart_defines/`, `google-services.json`, service account, `*.jks`
 | Tidak ada kredensial ter-commit | Ya |
 | Skrip ASCII | Ya |
 | `flutter pub get` | **Lolos di CI** (Flutter 3.32.5; `sqflite_sqlcipher` dipin 3.3.0) |
-| `flutter analyze` | **Bersih di CI** - `No issues found!` (run #18) |
-| `flutter test` | **90 test lolos di CI** (VS-1: 60; VS-2 menambah 5 UUID, 14 repository, 6 outbox, 5 widget movement) |
+| `flutter analyze` | **Bersih di CI** - `No issues found!` (run #24) |
+| `flutter test` | **105 test lolos di CI** (VS-1: 60; VS-2: 30; VS-3: 15) |
 | Build APK Android | **Lolos di CI** sebagai smoke build (Android di-scaffold, minSdk 26, compileSdk 36, NDK 27); bukan bukti konfigurasi final |
-| Rules test emulator | **37 kasus lolos di CI** (VS-2 menambah 2 kasus approval) |
-| Functions unit test | **22 test lolos di CI** (12 VS-1 + 10 `apply-balance`) |
+| Rules test emulator | **41 kasus lolos di CI** (VS-3 menambah 4 kasus resolusi konflik) |
+| Functions unit test | **27 test lolos di CI** (12 VS-1 + 15 `apply-balance`, termasuk reversal & konflik) |
 | Versi paket terkunci (`pubspec.lock`) | Diambil dari artifact CI lalu di-commit (77 paket) |
 | Login Google nyata di device | **Belum dijalankan** (butuh project dev + SHA-1) |
 | SQLCipher di device | **Belum dibuktikan** (baru desain + test non-enkripsi via FFI) |
@@ -478,16 +478,16 @@ Jangan commit: `dart_defines/`, `google-services.json`, service account, `*.jks`
 | Core loop VS-2 (simpan ≤1,5 s, offline → synced, saldo turun) | **Belum dibuktikan di device**; baru unit/widget test dengan remote palsu |
 | Exactly-once VS-2 (300 transaksi, replay, drift 0) | **Belum dibuktikan end-to-end**; unit test remote palsu lulus, trigger Firestore belum dijalankan di emulator |
 
-> Angka 90/37/22 dibuktikan oleh CI run #18 (`503465f`) yang keempat job-nya
+> Angka 105/41/27 dibuktikan oleh CI run #24 (`25898d7`) yang keempat job-nya
 > hijau. Bila CI menampilkan angka berbeda, perbaiki tabel ini pada commit yang
 > sama dengan perbaikannya.
 
-Bukti CI terakhir: run #18 (`503465f`) keempat job hijau. Detail per job:
+Bukti CI terakhir: run #24 (`25898d7`) keempat job hijau. Detail per job:
 
-- `Flutter analyze & test`: `No issues found!` + 90 test lulus, coverage terunggah.
+- `Flutter analyze & test`: `No issues found!` + 105 test lulus, coverage terunggah.
 - `Build debug APK`: `app-debug.apk` terbangun dan terunggah sebagai artifact.
-- `Firestore rules test`: 37 kasus lulus.
-- `Functions syntax & unit test`: 22 test lulus.
+- `Firestore rules test`: 41 kasus lulus.
+- `Functions syntax & unit test`: 27 test lulus.
 
 Riwayat CI (semua kegagalan sudah diperbaiki dan dibuktikan ulang):
 
@@ -509,6 +509,12 @@ Riwayat CI (semua kegagalan sudah diperbaiki dan dibuktikan ulang):
 | #16 | gagal | 85 lulus, 5 gagal: tombol `Keluar` tidak memilih jenis transaksi, sehingga `KELUAR` tidak ditemukan |
 | #17 | gagal | 87 lulus, 3 gagal: spinner tetap berputar saat dialog stok tidak cukup, `pumpAndSettle` timeout |
 | #18 | **hijau** | bukti VS-2: analyze bersih, 90 test, APK, 37 rules, 22 Functions |
+| #19 | **hijau** | dokumen bukti VS-2 |
+| #20 | gagal | VS-3: `widget.message` belum dipakai di SCR-01 + 2 `prefer_single_quotes` |
+| #21 | — | commit perantara `80aee61` (tidak dipantau terpisah) |
+| #22 | gagal | 104 lulus, 1 gagal: `history()` mengirim `limit`/`offset` sebagai argumen `WHERE` |
+| #23 | — | commit perantara `91f84e8` (tidak dipantau terpisah) |
+| #24 | **hijau** | bukti VS-3: analyze bersih, 105 test, APK, 41 rules, 27 Functions |
 
 ---
 

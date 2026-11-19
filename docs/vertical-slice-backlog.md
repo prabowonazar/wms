@@ -246,7 +246,7 @@ test Functions lulus.
 
 **Exit (G3):** skenario "sync gagal 3 hari" bisa dijelaskan & dipulihkan tanpa bantuan developer.
 
-**Status implementasi (19 Nov 2026; menunggu CI):**
+**Status implementasi (19 Nov 2026; CI run #24 hijau):**
 
 | Area | Kode | Bukti | Device |
 |---|---|---|---|
