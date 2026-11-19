@@ -131,11 +131,17 @@ class _MovementSheetState extends State<_MovementSheet> {
       if (!mounted) {
         return;
       }
+      // Hentikan spinner sebelum dialog: indikator yang terus berputar membuat
+      // layar uji tidak pernah "settle" dan pengguna mengira masih menyimpan.
+      setState(() => _saving = false);
       final overrideReason = await _askOverride(error);
       if (overrideReason == null) {
-        setState(() => _saving = false);
         return;
       }
+      if (!mounted) {
+        return;
+      }
+      setState(() => _saving = true);
       try {
         await _save(type, overrideReason: overrideReason);
       } on Object catch (retryError) {
