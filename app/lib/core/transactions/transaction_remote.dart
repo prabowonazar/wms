@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 import '../config/app_config.dart';
+import 'period_stock_card.dart';
 import 'stock_conflict.dart';
 import 'stock_transaction.dart';
 
@@ -29,6 +30,15 @@ abstract class TransactionRemote {
     required String reason,
     required String uid,
   });
+
+  /// Status periode hasil job closing (VS4-01).
+  Future<PeriodInfo?> fetchPeriod(String warehouseId, String periodKey);
+
+  /// Stock card periode yang sudah ditutup (VS4-02).
+  Future<List<PeriodStockCard>> fetchStockCards(
+    String warehouseId,
+    String periodKey,
+  );
 
   /// Membaca status akhir dari server untuk [transactionIds].
   ///
@@ -149,6 +159,63 @@ class FirestoreTransactionRemote implements TransactionRemote {
       },
     );
   }
+
+  @override
+  Future<PeriodInfo?> fetchPeriod(String warehouseId, String periodKey) async {
+    final doc = await _firestore
+        .collection('warehouses')
+        .doc(warehouseId)
+        .collection('periods')
+        .doc(periodKey)
+        .get();
+    final data = doc.data();
+    if (!doc.exists || data == null) {
+      return null;
+    }
+    return PeriodInfo(
+      periodKey: periodKey,
+      status: (data['status'] as String?) ?? 'open',
+      transactionCount: _asInt(data['transactionCount']),
+      productCount: _asInt(data['productCount']),
+      checksum: (data['snapshotChecksum'] as String?) ?? '',
+    );
+  }
+
+  @override
+  Future<List<PeriodStockCard>> fetchStockCards(
+    String warehouseId,
+    String periodKey,
+  ) async {
+    final snapshot = await _firestore
+        .collection('warehouses')
+        .doc(warehouseId)
+        .collection('periods')
+        .doc(periodKey)
+        .collection('stockCards')
+        .get();
+    return snapshot.docs.map(_cardFromDoc).toList(growable: false);
+  }
+
+  static PeriodStockCard _cardFromDoc(
+    QueryDocumentSnapshot<Map<String, dynamic>> doc,
+  ) {
+    final data = doc.data();
+    return PeriodStockCard(
+      productId: (data['productId'] as String?) ?? doc.id,
+      periodKey: (data['periodKey'] as String?) ?? '',
+      productCode: (data['productCode'] as String?) ?? '',
+      productName: (data['productName'] as String?) ?? '',
+      uom: (data['uom'] as String?) ?? '',
+      opening: _asInt(data['openingQty']),
+      incoming: _asInt(data['incomingQty']),
+      outgoing: _asInt(data['outgoingQty']),
+      adjustment: _asInt(data['adjustmentQty']),
+      ending: _asInt(data['endingQty']),
+      transactionCount: _asInt(data['transactionCount']),
+    );
+  }
+
+  static int _asInt(Object? value) => value is int ? value : 0;
 
   static StockConflict _conflictFromDoc(
     QueryDocumentSnapshot<Map<String, dynamic>> doc,

@@ -9,6 +9,7 @@ import '../../core/master/product.dart';
 import '../../core/master/product_repository.dart';
 import '../../core/observability/telemetry.dart';
 import '../../core/transactions/outbox_sync.dart';
+import '../../core/transactions/transaction_remote.dart';
 import '../../core/transactions/transaction_repository.dart';
 import '../home/settings_sheet.dart';
 import '../stock/stock_list_screen.dart';
@@ -37,6 +38,7 @@ class ScanScreen extends StatefulWidget {
     required this.profile,
     required this.onSignOut,
     this.scannerBuilder,
+    this.remote,
   });
 
   final Database database;
@@ -48,6 +50,9 @@ class ScanScreen extends StatefulWidget {
   final UserProfile profile;
   final Future<void> Function() onSignOut;
   final ScannerBuilder? scannerBuilder;
+
+  /// Remote untuk mengambil snapshot kartu stok periode tertutup.
+  final TransactionRemote? remote;
 
   @override
   State<ScanScreen> createState() => _ScanScreenState();
@@ -234,6 +239,8 @@ class _ScanScreenState extends State<ScanScreen> {
           builder: (_) => StockListScreen(
             products: widget.products,
             deps: _deps,
+            remote: widget.remote,
+            warehouseId: widget.profile.warehouseId,
           ),
         ),
       ),

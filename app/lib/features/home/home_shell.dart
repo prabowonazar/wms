@@ -15,6 +15,7 @@ import '../scan/product_sheet.dart';
 import '../scan/scan_screen.dart';
 import '../stock/stock_list_screen.dart';
 import '../sync/sync_screen.dart';
+import 'dashboard_screen.dart';
 import 'settings_sheet.dart';
 
 /// Kerangka beranda VS-3: Scan, Histori, Stok, Lainnya + chip status sync.
@@ -134,6 +135,17 @@ class _HomeShellState extends State<HomeShell> {
     await _loadSummary();
   }
 
+  Future<void> _openDashboard() async {
+    await Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => DashboardScreen(
+          products: _products,
+          transactions: _transactions,
+        ),
+      ),
+    );
+  }
+
   Future<void> _openSettings() async {
     final last = await _products.lastSyncedAt();
     if (!mounted) {
@@ -173,6 +185,7 @@ class _HomeShellState extends State<HomeShell> {
             profile: widget.profile,
             onSignOut: widget.services.auth.signOut,
             scannerBuilder: widget.scannerBuilder,
+            remote: widget.services.transactionRemote,
           ),
           HistoryScreen(
             repository: _transactions,
@@ -180,11 +193,17 @@ class _HomeShellState extends State<HomeShell> {
             profile: widget.profile,
             telemetry: widget.services.telemetry,
           ),
-          StockListScreen(products: _products, deps: deps),
+          StockListScreen(
+            products: _products,
+            deps: deps,
+            remote: widget.services.transactionRemote,
+            warehouseId: widget.profile.warehouseId,
+          ),
           MoreScreen(
             profile: widget.profile,
             summary: _summary,
             onOpenSync: _openSync,
+            onOpenDashboard: _openDashboard,
             onOpenSettings: _openSettings,
             onSignOut: widget.services.auth.signOut,
           ),
@@ -277,6 +296,7 @@ class MoreScreen extends StatelessWidget {
     required this.profile,
     required this.summary,
     required this.onOpenSync,
+    required this.onOpenDashboard,
     required this.onOpenSettings,
     required this.onSignOut,
   });
@@ -284,6 +304,7 @@ class MoreScreen extends StatelessWidget {
   final UserProfile profile;
   final SyncSummary? summary;
   final VoidCallback onOpenSync;
+  final VoidCallback onOpenDashboard;
   final VoidCallback onOpenSettings;
   final Future<void> Function() onSignOut;
 
@@ -333,6 +354,12 @@ class MoreScreen extends StatelessWidget {
             accountEmail: Text('${profile.role.label} · ${profile.warehouseId}'),
             decoration: BoxDecoration(color: theme.colorScheme.primaryContainer),
             currentAccountPictureSize: const Size.square(48),
+          ),
+          ListTile(
+            leading: const Icon(Icons.dashboard_outlined),
+            title: const Text('Dashboard'),
+            subtitle: const Text('Ringkasan produk & transaksi hari ini'),
+            onTap: onOpenDashboard,
           ),
           ListTile(
             leading: const Icon(Icons.sync),

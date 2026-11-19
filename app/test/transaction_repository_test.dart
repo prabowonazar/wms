@@ -461,4 +461,12 @@ void main() {
     );
     expect(await repository.openConflicts(), isEmpty);
   });
+
+  test('jumlah transaksi hari ini memakai periode WIB', () async {
+    final now = DateTime.utc(2026, 11, 18, 17, 30);
+    await record(qty: 2, id: 'tx-today', now: now);
+    await record(qty: 1, id: 'tx-yesterday', now: now.subtract(const Duration(days: 1)));
+
+    expect(await repository.transactionsTodayCount(now: now), 1);
+  });
 }

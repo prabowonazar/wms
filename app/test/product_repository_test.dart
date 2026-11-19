@@ -145,4 +145,23 @@ void main() {
       isTrue,
     );
   });
+
+  test('produk dengan saldo di bawah minimum dihitung sebagai perlu restock',
+      () async {
+    await seedProduct(database);
+    await database.update(
+      'products',
+      {'min_stock': 5},
+      where: 'product_id = ?',
+      whereArgs: ['p1'],
+    );
+    await insertLedgerRow(
+      database,
+      id: 'tx-out',
+      productId: 'p1',
+      signedQty: -3,
+    );
+
+    expect(await repository.lowStockCount(), 1);
+  });
 }

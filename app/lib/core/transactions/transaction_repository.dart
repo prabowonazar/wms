@@ -521,6 +521,17 @@ class TransactionRepository {
     return rows.map(StockTransaction.fromRow).toList(growable: false);
   }
 
+  /// Jumlah transaksi hari ini (periode WIB berjalan), tanpa yang `failed`.
+  Future<int> transactionsTodayCount({DateTime? now}) async {
+    final rows = await _database.rawQuery(
+      'SELECT COUNT(*) AS total FROM transactions '
+      "WHERE warehouse_id = ? AND period_key = ? AND sync_status <> 'failed'",
+      [_warehouseId, periodKeyFor(now ?? DateTime.now())],
+    );
+    final value = rows.first['total'];
+    return value is int ? value : 0;
+  }
+
   /// Transaksi `synced` dalam [within] terakhir, terbaru lebih dulu.
   ///
   /// Dipakai untuk menarik keputusan `serverStatus` (mis. penolakan stok dari

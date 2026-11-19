@@ -4,7 +4,9 @@ import 'package:flutter/material.dart';
 
 import '../../core/master/product.dart';
 import '../../core/master/product_repository.dart';
+import '../../core/transactions/transaction_remote.dart';
 import '../scan/product_sheet.dart';
+import 'stock_card_screen.dart';
 
 /// SCR-12: daftar stok per produk, dihitung dari ledger lokal.
 class StockListScreen extends StatefulWidget {
@@ -12,10 +14,16 @@ class StockListScreen extends StatefulWidget {
     super.key,
     required this.products,
     required this.deps,
+    required this.warehouseId,
+    this.remote,
   });
 
   final ProductRepository products;
   final ProductSheetDeps deps;
+
+  /// Sumber snapshot kartu stok periode tertutup (opsional untuk test).
+  final TransactionRemote? remote;
+  final String warehouseId;
 
   @override
   State<StockListScreen> createState() => _StockListScreenState();
@@ -117,6 +125,23 @@ class _StockListScreenState extends State<StockListScreen> {
       appBar: AppBar(
         title: const Text('Stok'),
         actions: [
+          if (widget.remote != null)
+            IconButton(
+              tooltip: 'Kartu stok',
+              onPressed: () => unawaited(
+                Navigator.of(context).push(
+                  MaterialPageRoute<void>(
+                    builder: (_) => StockCardScreen(
+                      products: widget.products,
+                      transactions: widget.deps.transactions,
+                      remote: widget.remote!,
+                      warehouseId: widget.warehouseId,
+                    ),
+                  ),
+                ),
+              ),
+              icon: const Icon(Icons.table_chart_outlined),
+            ),
           IconButton(
             tooltip: 'Muat ulang',
             onPressed: () => unawaited(_load()),

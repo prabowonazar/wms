@@ -122,6 +122,19 @@ class ProductRepository {
     return value is int ? value : 0;
   }
 
+  /// Jumlah produk aktif dengan saldo di bawah `min_stock` (FR-RPT-05).
+  Future<int> lowStockCount() async {
+    final rows = await _database.rawQuery(
+      'SELECT COUNT(*) AS total FROM products p '
+      'LEFT JOIN v_product_balance b '
+      'ON b.warehouse_id = ? AND b.product_id = p.product_id '
+      'WHERE p.active = 1 AND COALESCE(b.ending_qty, 0) < p.min_stock',
+      [_warehouseId],
+    );
+    final value = rows.first['total'];
+    return value is int ? value : 0;
+  }
+
   /// Kursor sync terakhir; dipakai banner "master data usang".
   Future<DateTime?> lastSyncedAt() async {
     final rows = await _database.query(

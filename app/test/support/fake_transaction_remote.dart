@@ -1,5 +1,6 @@
 import 'package:warehouse_mobile/core/observability/telemetry.dart';
 import 'package:warehouse_mobile/core/transactions/stock_conflict.dart';
+import 'package:warehouse_mobile/core/transactions/period_stock_card.dart';
 import 'package:warehouse_mobile/core/transactions/stock_transaction.dart';
 import 'package:warehouse_mobile/core/transactions/transaction_remote.dart';
 
@@ -15,6 +16,11 @@ class FakeTransactionRemote implements TransactionRemote {
   final List<StockConflict> conflicts = <StockConflict>[];
   final List<String> resolvedConflicts = <String>[];
   final List<int?> deviceEndingQties = <int?>[];
+
+  /// Periode yang "sudah ditutup" di server palsu.
+  final Map<String, PeriodInfo> periods = <String, PeriodInfo>{};
+  final Map<String, List<PeriodStockCard>> periodCards =
+      <String, List<PeriodStockCard>>{};
 
   bool offline = false;
   int createCalls = 0;
@@ -69,6 +75,19 @@ class FakeTransactionRemote implements TransactionRemote {
   }) async {
     resolvedConflicts.add(conflictId);
     conflicts.removeWhere((item) => item.conflictId == conflictId);
+  }
+
+  @override
+  Future<PeriodInfo?> fetchPeriod(String warehouseId, String periodKey) async {
+    return periods[periodKey];
+  }
+
+  @override
+  Future<List<PeriodStockCard>> fetchStockCards(
+    String warehouseId,
+    String periodKey,
+  ) async {
+    return List<PeriodStockCard>.unmodifiable(periodCards[periodKey] ?? const []);
   }
 }
 
