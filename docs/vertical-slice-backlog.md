@@ -293,7 +293,7 @@ test Functions lulus.
 
 **Exit (pilot gate):** semua angka pada §9 terukur, 0 bug P0/P1, operator bisa memakai tanpa pendampingan developer.
 
-**Status implementasi (19 Nov 2026; menunggu CI):**
+**Status implementasi (19 Nov 2026; CI run #31 hijau):**
 
 | Area | Kode | Bukti | Device |
 |---|---|---|---|
