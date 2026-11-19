@@ -21,6 +21,7 @@ Future<bool?> showMovementSheet(
   required Telemetry telemetry,
   required int balance,
   String source = 'scan',
+  TransactionType? initialType,
 }) {
   return showModalBottomSheet<bool>(
     context: context,
@@ -34,6 +35,7 @@ Future<bool?> showMovementSheet(
       telemetry: telemetry,
       balance: balance,
       source: source,
+      initialType: initialType,
     ),
   );
 }
@@ -47,6 +49,7 @@ class _MovementSheet extends StatefulWidget {
     required this.telemetry,
     required this.balance,
     required this.source,
+    this.initialType,
   });
 
   final ProductView view;
@@ -56,6 +59,10 @@ class _MovementSheet extends StatefulWidget {
   final Telemetry telemetry;
   final int balance;
   final String source;
+
+  /// Jenis yang sudah dipilih dari tombol lembar produk. `null` bila lembar
+  /// dibuka langsung tanpa konteks (pengguna memilih sendiri).
+  final TransactionType? initialType;
 
   @override
   State<_MovementSheet> createState() => _MovementSheetState();
@@ -70,7 +77,7 @@ class _MovementSheetState extends State<_MovementSheet> {
       TextEditingController(text: '1');
   final TextEditingController _noteController = TextEditingController();
 
-  TransactionType? _type;
+  late TransactionType? _type = widget.initialType;
   int _qty = 1;
   bool _saving = false;
   String? _error;

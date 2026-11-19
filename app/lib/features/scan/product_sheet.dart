@@ -92,6 +92,7 @@ class _ProductSheetState extends State<_ProductSheet> {
       telemetry: widget.deps.telemetry,
       balance: _balance,
       source: widget.source,
+      initialType: type,
     );
     if (!mounted || saved != true) {
       return;
@@ -200,6 +201,7 @@ class _ProductSheetState extends State<_ProductSheet> {
                   child: SizedBox(
                     height: 52,
                     child: FilledButton.icon(
+                      key: const Key('product-incoming'),
                       onPressed: () =>
                           unawaited(_startMovement(TransactionType.incoming)),
                       icon: const Icon(Icons.south_west),
@@ -212,6 +214,7 @@ class _ProductSheetState extends State<_ProductSheet> {
                   child: SizedBox(
                     height: 52,
                     child: FilledButton.tonalIcon(
+                      key: const Key('product-outgoing'),
                       onPressed: () =>
                           unawaited(_startMovement(TransactionType.outgoing)),
                       icon: const Icon(Icons.north_east),

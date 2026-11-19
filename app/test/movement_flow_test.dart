@@ -164,7 +164,7 @@ void main() {
 
     expect(find.text('5 box'), findsOneWidget);
 
-    await tester.tap(find.text('KELUAR'));
+    await tester.tap(find.byKey(const Key('product-outgoing')));
     await tester.pumpAndSettle();
     await tester.tap(find.byTooltip('Tambah'));
     await tester.pumpAndSettle();
@@ -188,7 +188,7 @@ void main() {
   ) async {
     await openProductSheet(tester, operatorProfile);
 
-    await tester.tap(find.text('KELUAR'));
+    await tester.tap(find.byKey(const Key('product-outgoing')));
     await tester.pumpAndSettle();
     await tapSave(tester);
 
@@ -207,7 +207,7 @@ void main() {
   ) async {
     await openProductSheet(tester, supervisor);
 
-    await tester.tap(find.text('KELUAR'));
+    await tester.tap(find.byKey(const Key('product-outgoing')));
     await tester.pumpAndSettle();
     await tapSave(tester);
 
@@ -235,7 +235,7 @@ void main() {
   ) async {
     await openProductSheet(tester, supervisor);
 
-    await tester.tap(find.text('KELUAR'));
+    await tester.tap(find.byKey(const Key('product-outgoing')));
     await tester.pumpAndSettle();
     await tapSave(tester);
 
@@ -256,7 +256,7 @@ void main() {
   testWidgets('qty 0 membuat tombol simpan nonaktif', (tester) async {
     await openProductSheet(tester, operatorProfile);
 
-    await tester.tap(find.text('KELUAR'));
+    await tester.tap(find.byKey(const Key('product-outgoing')));
     await tester.pumpAndSettle();
     await tester.enterText(find.byType(TextField).first, '0');
     await tester.pumpAndSettle();
