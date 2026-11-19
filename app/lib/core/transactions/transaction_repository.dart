@@ -510,7 +510,6 @@ class TransactionRepository {
       args.addAll(<String>['%$trimmed%', '%$trimmed%']);
     }
 
-    args.addAll(<int>[limit, offset]);
     final rows = await _database.query(
       'transactions',
       where: clauses.join(' AND '),

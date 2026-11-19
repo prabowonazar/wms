@@ -6,25 +6,28 @@ sekali. Proyek ini dibangun bertahap lewat 7 vertical slice (VS-0..VS-6).
 
 ## Status
 
-**VS-0 (fondasi), VS-1 (scan & master data offline), dan VS-2 (core loop
-transaksi offline → sync → saldo) - kode selesai dan lolos test lokal/CI;
+**VS-0 (fondasi), VS-1 (scan & master data offline), VS-2 (core loop
+transaksi offline → sync → saldo), dan VS-3 (status sync, retry, konflik,
+histori, reversal) - kode selesai; bukti CI untuk VS-3 sedang dijalankan;
 belum diverifikasi di device.**
 
-Yang sudah ada: login Google + role gate, database SQLCipher, skema v1, rules
-Firestore + 37 test rules, Cloud Functions `health`, `importProducts`, dan
-trigger `applyBalance` + 22 test, sync master full/delta, layar scan +
-pencarian lokal, ledger lokal + outbox idempoten, lembar masuk/keluar, saldo
-& stock card, CI, dan runbook.
+Yang sudah ada: login Google + role gate (sesi offline maksimal 7 hari),
+database SQLCipher, skema v1, rules Firestore + 41 test rules, Cloud Functions
+`health`, `importProducts`, dan `applyBalance` + 19 test, sync master
+full/delta, layar scan + pencarian lokal, ledger lokal + outbox idempoten,
+lembar masuk/keluar, saldo & stock card, layar sinkronisasi dengan backoff 5×
+dan penolakan server, deteksi/resolusi konflik saldo, histori berfilter,
+reversal + audit, CI, dan runbook.
 
 > Mesin ini tidak punya Flutter/Dart/Node/Java, jadi seluruh bukti kompilasi
-> datang dari CI GitHub Actions (run #18, commit `503465f`): `flutter analyze`
-> bersih, 90 test Flutter, APK debug terbangun, 37 test rules, dan 22 test
-> Functions lulus. Yang masih terbuka
+> datang dari CI GitHub Actions. Untuk VS-2, run #18 (`503465f`) membuktikan
+> `flutter analyze` bersih, 90 test Flutter, APK debug, 37 test rules, dan 22
+> test Functions. VS-3 menambah test/test rules; lihat §10 runbook untuk angka
+> final setelah CI hijau. Yang masih terbuka
 > hanya bukti di device: login Google nyata, kamera & debounce, simpan
-> transaksi ≤1,5 s, airplane mode → `synced`, override supervisor, SQLCipher,
-> Crashlytics, serta angka NFR (lookup p95, scan→tampil, sync 2.000 SKU).
-> Outbox VS-2 masih memakai timer foreground, bukan WorkManager - lihat
-> keterbatasan di `docs/vertical-slice-backlog.md` (VS-2).
+> transaksi ≤1,5 s, airplane mode → `synced`, override supervisor, konflik dua
+> device, SQLCipher, Crashlytics, serta angka NFR. Outbox masih memakai timer
+> foreground, bukan WorkManager - lihat `docs/vertical-slice-backlog.md` (VS-2).
 
 ## Mulai cepat
 
