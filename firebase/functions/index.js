@@ -2,8 +2,10 @@
 
 const { onCall, HttpsError } = require('firebase-functions/v2/https');
 const { onDocumentCreated } = require('firebase-functions/v2/firestore');
+const { onSchedule } = require('firebase-functions/v2/scheduler');
+const { defineSecret } = require('firebase-functions/params');
 const { initializeApp } = require('firebase-admin/app');
-const { getFirestore, FieldValue } = require('firebase-admin/firestore');
+const { getFirestore, FieldValue, FieldPath } = require('firebase-admin/firestore');
 
 const { buildHealthPayload } = require('./lib/health');
 const { decideApply, shouldFlagConflict } = require('./lib/apply-balance');
@@ -13,6 +15,22 @@ const {
   planImport,
   countBillableImports,
 } = require('./lib/import-products');
+const {
+  previousPeriodKey,
+  buildStockCards,
+  buildPeriodSnapshot,
+} = require('./lib/period-close');
+const {
+  HEADER,
+  buildExportRows,
+  planExport,
+  rowsChecksum,
+  reconcile,
+} = require('./lib/sheet-export');
+const sheets = require('./lib/sheets-client');
+
+const sheetsCredentials = defineSecret('SHEETS_SERVICE_ACCOUNT');
+const sheetsSpreadsheetId = defineSecret('SHEETS_SPREADSHEET_ID');
 
 initializeApp();
 
@@ -539,3 +557,351 @@ function toMillis(value) {
   }
   return 0;
 }
+
+// ---------------------------------------------------------------------------
+// VS-4: closing, ekspor Sheet, dan rekonsiliasi
+// ---------------------------------------------------------------------------
+
+async function fetchAppliedTransactions(periodKey) {
+  const rows = [];
+  let last = null;
+  const pageSize = 500;
+  for (;;) {
+    let query = db
+      .collection('transactions')
+      .where('periodKey', '==', periodKey)
+      .where('serverStatus', '==', 'applied')
+      .orderBy(FieldPath.documentId)
+      .limit(pageSize);
+    if (last) {
+      query = query.startAfter(last);
+    }
+    const snapshot = await query.get();
+    if (snapshot.empty) {
+      break;
+    }
+    for (const doc of snapshot.docs) {
+      rows.push({ transactionId: doc.id, ...doc.data() });
+    }
+    if (snapshot.size < pageSize) {
+      break;
+    }
+    last = snapshot.docs[snapshot.size - 1];
+  }
+  return rows;
+}
+
+async function commitChunks(writes) {
+  for (let i = 0; i < writes.length; i += 400) {
+    const batch = db.batch();
+    for (const { ref, data, merge } of writes.slice(i, i + 400)) {
+      if (merge) {
+        batch.set(ref, data, { merge: true });
+      } else {
+        batch.set(ref, data);
+      }
+    }
+    await batch.commit();
+  }
+}
+
+function wait(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+/** 00:05 WIB: kunci periode D-1 dan simpan stock card per produk. */
+exports.closeDailyPeriod = onSchedule(
+  { schedule: '5 0 * * *', timeZone: 'Asia/Jakarta', region: REGION },
+  async () => {
+    const periodKey = previousPeriodKey();
+    const warehouses = await db.collection('warehouses').get();
+    const productSnapshot = await db.collection('products').get();
+    const products = productSnapshot.docs.map((doc) => ({
+      productId: doc.id,
+      productCode: doc.data().code || '',
+      productName: doc.data().name || '',
+      uom: doc.data().uom || '',
+      warehouseId: (doc.data().warehouseIds || [])[0] || '',
+    }));
+
+    for (const warehouse of warehouses.docs) {
+      const periodRef = db
+        .collection('warehouses')
+        .doc(warehouse.id)
+        .collection('periods')
+        .doc(periodKey);
+      const existing = await periodRef.get();
+      if (existing.exists && existing.get('status') === 'closed') {
+        continue; // Idempoten: job dijalankan ulang tidak mengubah snapshot.
+      }
+
+      const transactions = (await fetchAppliedTransactions(periodKey)).filter(
+        (txn) => txn.warehouseId === warehouse.id,
+      );
+      const balanceSnapshot = await db
+        .collection('warehouses')
+        .doc(warehouse.id)
+        .collection('balances')
+        .get();
+      const balances = balanceSnapshot.docs.map((doc) => ({
+        productId: doc.id,
+        warehouseId: warehouse.id,
+        endingQty: doc.data().endingQty || 0,
+      }));
+
+      let cards = buildStockCards({
+        transactions,
+        products,
+        balances,
+        periodKey,
+      });
+      // Produk tanpa mutasi tetap masuk laporan, dengan opening = saldo.
+      const covered = new Set(cards.map((card) => card.productId));
+      for (const balance of balances) {
+        if (covered.has(balance.productId)) {
+          continue;
+        }
+        const product = products.find(
+          (item) => item.productId === balance.productId,
+        );
+        cards.push({
+          warehouseId: warehouse.id,
+          periodKey,
+          productId: balance.productId,
+          productCode: product ? product.productCode : '',
+          productName: product ? product.productName : '',
+          uom: product ? product.uom : '',
+          openingQty: balance.endingQty,
+          incomingQty: 0,
+          outgoingQty: 0,
+          adjustmentQty: 0,
+          endingQty: balance.endingQty,
+          transactionCount: 0,
+        });
+      }
+      cards.sort((a, b) => a.productCode.localeCompare(b.productCode));
+
+      const snapshot = buildPeriodSnapshot(cards, periodKey);
+      const writes = [
+        { ref: periodRef, data: snapshot, merge: true },
+      ];
+      for (const card of cards) {
+        writes.push({
+          ref: periodRef.collection('stockCards').doc(card.productId),
+          data: { ...card, computedAt: FieldValue.serverTimestamp() },
+          merge: true,
+        });
+      }
+      writes.push({
+        ref: db.collection('auditLogs').doc(),
+        data: {
+          action: 'period.closed',
+          actorUid: 'system',
+          entityType: 'periods',
+          entityId: periodKey,
+          reason: 'closing harian 00:05 WIB',
+          before: { status: existing.exists ? existing.get('status') : null },
+          after: { status: 'closed', productCount: cards.length },
+          at: FieldValue.serverTimestamp(),
+        },
+      });
+      await commitChunks(writes);
+    }
+  },
+);
+
+function sheetsConfig() {
+  let credentials;
+  let spreadsheetId;
+  try {
+    credentials = sheetsCredentials.value();
+    spreadsheetId = sheetsSpreadsheetId.value();
+  } catch (error) {
+    return null;
+  }
+  if (!credentials || !spreadsheetId) {
+    return null;
+  }
+  try {
+    return { credentials: JSON.parse(credentials), spreadsheetId };
+  } catch (error) {
+    return null;
+  }
+}
+
+async function appendWithRetry(token, config, range, values) {
+  let lastError;
+  for (let attempt = 1; attempt <= 3; attempt++) {
+    try {
+      return await sheets.appendRange(
+        token,
+        config.spreadsheetId,
+        range,
+        values,
+      );
+    } catch (error) {
+      lastError = error;
+      if (attempt < 3) {
+        await wait(attempt === 1 ? 5000 : 15000);
+      }
+    }
+  }
+  throw lastError;
+}
+
+/** 02:00 WIB: ekspor transaksi D-1 ke Sheet, idempoten per transactionId. */
+exports.exportDailySheet = onSchedule(
+  {
+    schedule: '0 2 * * *',
+    timeZone: 'Asia/Jakarta',
+    region: REGION,
+    secrets: [sheetsCredentials, sheetsSpreadsheetId],
+    timeoutSeconds: 300,
+  },
+  async () => {
+    const config = sheetsConfig();
+    if (!config) {
+      console.warn('Sheet export dilewati: kredensial belum dikonfigurasi.');
+      return;
+    }
+
+    const periodKey = previousPeriodKey();
+    const exportRef = db.collection('sheetExports').doc(`${periodKey}_1`);
+    const previous = await exportRef.get();
+    if (previous.exists && previous.get('status') === 'success') {
+      return;
+    }
+
+    const startedAt = FieldValue.serverTimestamp();
+    await exportRef.set(
+      {
+        periodKey,
+        spreadsheetId: config.spreadsheetId,
+        tabName: periodKey.slice(0, 7),
+        status: 'running',
+        attempts: 1,
+        startedAt,
+        rowCount: 0,
+        checksum: '',
+      },
+      { merge: true },
+    );
+
+    try {
+      const rows = buildExportRows(
+        await fetchAppliedTransactions(periodKey),
+        periodKey,
+      );
+      const token = await sheets.fetchAccessToken(config.credentials);
+      const tab = periodKey.slice(0, 7);
+      const existing = await sheets.readRange(
+        token,
+        config.spreadsheetId,
+        `${tab}!A:A`,
+      );
+      const existingIds = existing
+        .map((row) => (row && row.length ? String(row[0]) : ''))
+        .filter((id) => id && id !== HEADER[0]);
+      const plan = planExport(rows, existingIds);
+
+      if (plan.toAppend.length > 0) {
+        const values = existingIds.length === 0
+          ? [HEADER, ...plan.toAppend]
+          : plan.toAppend;
+        await appendWithRetry(token, config, `${tab}!A1`, values);
+      }
+
+      await exportRef.set(
+        {
+          status: 'success',
+          rowCount: rows.length,
+          appendedRows: plan.toAppend.length,
+          duplicateRows: plan.duplicates,
+          checksum: rowsChecksum(rows),
+          finishedAt: FieldValue.serverTimestamp(),
+          error: null,
+        },
+        { merge: true },
+      );
+    } catch (error) {
+      await exportRef.set(
+        {
+          status: 'failed',
+          error: String(error && error.message ? error.message : error),
+          finishedAt: FieldValue.serverTimestamp(),
+        },
+        { merge: true },
+      );
+      console.error('exportDailySheet gagal', error);
+    }
+  },
+);
+
+/** 02:30 WIB: bandingkan isi Sheet dengan Firestore (FR-SYN-07). */
+exports.reconcileSheet = onSchedule(
+  {
+    schedule: '30 2 * * *',
+    timeZone: 'Asia/Jakarta',
+    region: REGION,
+    secrets: [sheetsCredentials, sheetsSpreadsheetId],
+    timeoutSeconds: 300,
+  },
+  async () => {
+    const config = sheetsConfig();
+    if (!config) {
+      return;
+    }
+    const periodKey = previousPeriodKey();
+    const exportRef = db.collection('sheetExports').doc(`${periodKey}_1`);
+    const exportDoc = await exportRef.get();
+    if (!exportDoc.exists) {
+      return;
+    }
+
+    try {
+      const expectedRows = buildExportRows(
+        await fetchAppliedTransactions(periodKey),
+        periodKey,
+      );
+      const token = await sheets.fetchAccessToken(config.credentials);
+      const sheetRows = await sheets.readRange(
+        token,
+        config.spreadsheetId,
+        `${periodKey.slice(0, 7)}!A:J`,
+      );
+      const result = reconcile({ expectedRows, sheetRows });
+
+      await exportRef.set(
+        {
+          reconciliation: {
+            status: result.status,
+            rowCount: result.rowCount,
+            expectedRowCount: result.expectedRowCount,
+            duplicates: result.duplicates,
+            missingCount: result.missing.length,
+            extraCount: result.extra.length,
+            checksumMatch: result.checksumMatch,
+            checkedAt: FieldValue.serverTimestamp(),
+          },
+          status: result.status === 'verified' ? 'success' : result.status,
+        },
+        { merge: true },
+      );
+      await db.collection('auditLogs').add({
+        action: 'export.reconciled',
+        actorUid: 'system',
+        entityType: 'sheetExports',
+        entityId: exportRef.id,
+        reason: result.status,
+        after: {
+          rowCount: result.rowCount,
+          duplicates: result.duplicates,
+          checksumMatch: result.checksumMatch,
+        },
+        at: FieldValue.serverTimestamp(),
+      });
+    } catch (error) {
+      console.error('reconcileSheet gagal', error);
+    }
+  },
+);
