@@ -14,11 +14,14 @@ void main() {
       MaterialApp(home: BootstrapFailureScreen(error: error)),
     );
 
-    expect(
-      find.text('SqfliteDatabaseException: file is not a database (code 26)'),
-      findsOneWidget,
-    );
     expect(find.byKey(const Key('bootstrap-error-detail')), findsOneWidget);
+    final detail = tester.widget<SelectableText>(
+      find.byKey(const Key('bootstrap-error-detail')),
+    );
+    expect(
+      detail.data,
+      'SqfliteDatabaseException: file is not a database (code 26)',
+    );
     expect(find.text('Salin detail'), findsOneWidget);
   });
 }
