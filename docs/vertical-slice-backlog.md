@@ -384,7 +384,7 @@ test Functions lulus.
 
 **Exit (rollout R1):** pilot 2 minggu lulus, tim ops bisa menangani insiden tanpa developer.
 
-**Status implementasi (19 Nov 2026; menunggu CI):**
+**Status implementasi (19 Nov 2026; CI run #39 hijau):**
 
 | Area | Kode | Bukti | Device/Ops |
 |---|---|---|---|

@@ -6,8 +6,9 @@ sekali. Proyek ini dibangun bertahap lewat 7 vertical slice (VS-0..VS-6).
 
 ## Status
 
-**VS-0 sampai VS-4: kode selesai dan CI hijau. VS-5 (cycle count & approval):
-kode selesai dan CI hijau; belum diverifikasi di device.**
+**VS-0 sampai VS-5: kode selesai dan CI hijau. VS-6 (hardening & rollout):
+kode selesai dan CI hijau; bukti device/ops masih terbuka (lihat
+`docs/rollout-checklist.md`).**
 
 Yang sudah ada: login Google + role gate (sesi offline maksimal 7 hari),
 database SQLCipher, skema v1, rules Firestore + 41 test rules, Cloud Functions
@@ -19,8 +20,8 @@ saldo, histori berfilter, reversal + audit, dashboard, cycle count, CI, dan
 runbook.
 
 > Mesin ini tidak punya Flutter/Dart/Node/Java, jadi seluruh bukti kompilasi
-> datang dari CI GitHub Actions (run #36, commit `4345ead`): `flutter analyze`
-> bersih, 112 test Flutter, APK debug terbangun, 41 test rules, dan 47 test
+> datang dari CI GitHub Actions (run #39, commit `4695d0b`): `flutter analyze`
+> bersih, 112 test Flutter, APK debug terbangun, 46 test rules, dan 51 test
 > Functions lulus. Yang masih terbuka
 > hanya bukti di device: login Google nyata, kamera & debounce, simpan
 > transaksi ≤1,5 s, airplane mode → `synced`, override supervisor, konflik dua
