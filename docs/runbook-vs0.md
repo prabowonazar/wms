@@ -281,8 +281,33 @@ firebase deploy --only functions
 key boleh ditulis literal `\\n`). Service account harus diberi akses **Editor**
 pada spreadsheet yang ID-nya ada di `SHEETS_SPREADSHEET_ID`. Tanpa kedua
 secret, job mencatat peringatan dan dilewati — aplikasi tetap berjalan.
-Right Spreadsheet harus memiliki tab bernama `YYYY-MM` (mis. `2026-11`);
+Spreadsheet harus memiliki tab bernama `YYYY-MM` (mis. `2026-11`);
 job membuat header bila tab masih kosong.
+
+### 5.2 APK dev dari CI (untuk demo device)
+
+APK yang dibangun CI tanpa secret memakai nilai dummy, jadi tombol
+**Masuk dengan Google** tidak akan berhasil. Untuk menghasilkan APK yang bisa
+login, tambahkan GitHub Secrets di **Settings → Secrets and variables →
+Actions** pada repository:
+
+| Secret | Sumber |
+|---|---|
+| `FB_PROJECT_ID` | Project ID Firebase dev |
+| `FB_API_KEY` | Android API key (bukan service account) |
+| `FB_APP_ID` | App ID Android |
+| `FB_MESSAGING_SENDER_ID` | Sender ID |
+| `GOOGLE_SERVER_CLIENT_ID` | Web OAuth client ID untuk Google Sign-In |
+| `FB_STORAGE_BUCKET` | Opsional |
+
+Job `Build debug APK` mencetak **SHA-1 debug keystore CI** di log
+(`keytool -list ... | grep SHA1`). Daftarkan SHA-1 itu di Firebase Console →
+Authentication → Sign-in method → Google → **Authorized domains / SHA certificate
+fingerprints** untuk package `id.co.contoh.warehouse_mobile`. Keystore di-cache
+agar SHA-1 stabil antar run. Setelah secret dan SHA-1 terdaftar, jalankan ulang
+workflow dan pasang artifact `app-debug-apk` terbaru.
+
+Jangan pernah commit nilai-nilai di atas maupun `google-services.json`.
 
 ---
 
