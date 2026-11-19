@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../../bootstrap/app_services.dart';
+import '../../core/admin/admin_remote.dart';
 import '../../core/auth/auth_models.dart';
 import '../../core/config/app_config.dart';
 import '../../core/master/master_sync.dart';
@@ -11,6 +12,7 @@ import '../../core/transactions/outbox_sync.dart';
 import '../../core/transactions/sync_summary.dart';
 import '../../core/transactions/transaction_repository.dart';
 import '../history/history_screen.dart';
+import '../admin/admin_screen.dart';
 import '../scan/product_sheet.dart';
 import '../scan/scan_screen.dart';
 import '../stock/stock_list_screen.dart';
@@ -146,6 +148,14 @@ class _HomeShellState extends State<HomeShell> {
     );
   }
 
+  Future<void> _openAdmin() async {
+    await Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => AdminScreen(remote: const AdminRemote()),
+      ),
+    );
+  }
+
   Future<void> _openSettings() async {
     final last = await _products.lastSyncedAt();
     if (!mounted) {
@@ -204,6 +214,7 @@ class _HomeShellState extends State<HomeShell> {
             summary: _summary,
             onOpenSync: _openSync,
             onOpenDashboard: _openDashboard,
+            onOpenAdmin: _openAdmin,
             onOpenSettings: _openSettings,
             onSignOut: widget.services.auth.signOut,
           ),
@@ -297,6 +308,7 @@ class MoreScreen extends StatelessWidget {
     required this.summary,
     required this.onOpenSync,
     required this.onOpenDashboard,
+    required this.onOpenAdmin,
     required this.onOpenSettings,
     required this.onSignOut,
   });
@@ -305,6 +317,7 @@ class MoreScreen extends StatelessWidget {
   final SyncSummary? summary;
   final VoidCallback onOpenSync;
   final VoidCallback onOpenDashboard;
+  final VoidCallback onOpenAdmin;
   final VoidCallback onOpenSettings;
   final Future<void> Function() onSignOut;
 
@@ -361,6 +374,13 @@ class MoreScreen extends StatelessWidget {
             subtitle: const Text('Ringkasan produk & transaksi hari ini'),
             onTap: onOpenDashboard,
           ),
+          if (profile.role == UserRole.admin)
+            ListTile(
+              leading: const Icon(Icons.admin_panel_settings_outlined),
+              title: const Text('Admin'),
+              subtitle: const Text('User & transaksi ditolak'),
+              onTap: onOpenAdmin,
+            ),
           ListTile(
             leading: const Icon(Icons.sync),
             title: const Text('Sinkronisasi'),

@@ -16,6 +16,11 @@ const {
   countBillableImports,
 } = require('./lib/import-products');
 const {
+  isAdmin,
+  validateUserUpdate,
+  validateRetryRequest,
+} = require('./lib/admin');
+const {
   previousPeriodKey,
   buildStockCards,
   buildPeriodSnapshot,
@@ -181,14 +186,8 @@ exports.importProducts = onCall(
  * pengiriman ulang dokumen yang sama tidak memicu efek kedua karena rules
  * create-only + replay guard `lastTransactionId`.
  */
-exports.applyBalance = onDocumentCreated(
-  { document: 'transactions/{transactionId}', region: REGION },
-  async (event) => {
-    const snapshot = event.data;
-    if (!snapshot) {
-      return;
-    }
-    const data = snapshot.data();
+async function applyTransactionToBalance(snapshot) {
+  const data = snapshot.data();
     if (!data || data.serverStatus) {
       // Sudah diproses (mis. retry trigger setelah commit sukses).
       return;
@@ -349,6 +348,16 @@ exports.applyBalance = onDocumentCreated(
         at: now,
       });
     });
+}
+
+exports.applyBalance = onDocumentCreated(
+  { document: 'transactions/{transactionId}', region: REGION },
+  async (event) => {
+    const snapshot = event.data;
+    if (!snapshot) {
+      return;
+    }
+    await applyTransactionToBalance(snapshot);
   },
 );
 
@@ -905,3 +914,116 @@ exports.reconcileSheet = onSchedule(
     }
   },
 );
+
+// ---------------------------------------------------------------------------
+// VS-4: administrasi (FR-ADM-01/02/03)
+// ---------------------------------------------------------------------------
+
+async function requestRole(request) {
+  if (!request.auth || !request.auth.uid) {
+    throw new HttpsError('unauthenticated', 'Login diperlukan.');
+  }
+  const snapshot = await db.doc(`users/${request.auth.uid}`).get();
+  return snapshot.exists ? snapshot.get('role') : null;
+}
+
+/** Admin mengubah role/status user; semua perubahan tercatat di audit log. */
+exports.adminUpdateUser = onCall({ region: REGION }, async (request) => {
+  const role = await requestRole(request);
+  if (!isAdmin(role)) {
+    throw new HttpsError('permission-denied', 'Hanya Admin yang boleh mengubah user.');
+  }
+  const result = validateUserUpdate(request.data || {});
+  if (!result.ok) {
+    throw new HttpsError('invalid-argument', result.error);
+  }
+  const uid = request.data.uid;
+  if (typeof uid !== 'string' || uid.trim() === '') {
+    throw new HttpsError('invalid-argument', 'missing_uid');
+  }
+  const ref = db.doc(`users/${uid.trim()}`);
+  const before = await ref.get();
+  if (!before.exists) {
+    throw new HttpsError('not-found', 'user_not_found');
+  }
+  const changes = { ...result.changes };
+  delete changes.reason;
+  await ref.update({ ...changes, updatedAt: FieldValue.serverTimestamp() });
+  await db.collection('auditLogs').add({
+    action: 'user.role.update',
+    actorUid: request.auth.uid,
+    actorRole: role,
+    entityType: 'users',
+    entityId: uid.trim(),
+    reason: result.changes.reason,
+    before: Object.fromEntries(
+      Object.keys(changes).map((key) => [key, before.get(key) ?? null]),
+    ),
+    after: changes,
+    at: FieldValue.serverTimestamp(),
+  });
+  return { ok: true, uid: uid.trim(), changes };
+});
+
+/** Daftar transaksi yang ditolak server untuk ditindaklanjuti Admin. */
+exports.adminListFailed = onCall({ region: REGION }, async (request) => {
+  const role = await requestRole(request);
+  if (!isAdmin(role) && role !== 'supervisor') {
+    throw new HttpsError('permission-denied', 'Tidak ada izin monitoring.');
+  }
+  const snapshot = await db
+    .collection('transactions')
+    .where('serverStatus', '==', 'rejected')
+    .limit(50)
+    .get();
+  return {
+    items: snapshot.docs.map((doc) => ({
+      transactionId: doc.id,
+      warehouseId: doc.get('warehouseId'),
+      productCode: doc.get('productCode'),
+      productName: doc.get('productName'),
+      type: doc.get('type'),
+      qty: doc.get('qty'),
+      userId: doc.get('userId'),
+      rejectedReason: doc.get('rejectedReason'),
+      periodKey: doc.get('periodKey'),
+    })),
+  };
+});
+
+/**
+ * Retry paksa transaksi yang ditolak. Karena trigger applyBalance hanya jalan
+ * saat create, status server dihapus dulu oleh Admin SDK lalu logika yang sama
+ * dipanggil ulang. Idempoten lewat replay guard `lastTransactionId`.
+ */
+exports.adminForceRetry = onCall({ region: REGION }, async (request) => {
+  const role = await requestRole(request);
+  if (!isAdmin(role)) {
+    throw new HttpsError('permission-denied', 'Hanya Admin yang boleh retry paksa.');
+  }
+  const result = validateRetryRequest(request.data || {});
+  if (!result.ok) {
+    throw new HttpsError('invalid-argument', result.error);
+  }
+  const ref = db.collection('transactions').doc(result.transactionId);
+  const current = await ref.get();
+  if (!current.exists || current.get('serverStatus') !== 'rejected') {
+    throw new HttpsError('failed-precondition', 'transaction_not_rejected');
+  }
+  await ref.update({
+    serverStatus: FieldValue.delete(),
+    rejectedReason: FieldValue.delete(),
+    processedAt: FieldValue.delete(),
+  });
+  await applyTransactionToBalance(await ref.get());
+  await db.collection('auditLogs').add({
+    action: 'transaction.force_retry',
+    actorUid: request.auth.uid,
+    actorRole: role,
+    entityType: 'transactions',
+    entityId: result.transactionId,
+    reason: result.reason,
+    at: FieldValue.serverTimestamp(),
+  });
+  return { ok: true, transactionId: result.transactionId };
+});
