@@ -137,7 +137,10 @@ final class AuthChecking extends AuthState {
 }
 
 final class AuthSignedOut extends AuthState {
-  const AuthSignedOut();
+  const AuthSignedOut({this.message});
+
+  /// Pesan opsional, misalnya "Sesi berakhir" setelah offline >7 hari.
+  final String? message;
 }
 
 final class AuthDenied extends AuthState {

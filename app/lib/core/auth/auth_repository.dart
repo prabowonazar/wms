@@ -37,6 +37,18 @@ class AuthRepository {
 
   static const Duration _profileTimeout = Duration(seconds: 8);
 
+  /// Batas sesi offline sebelum pengguna wajib login ulang (FR-AUTH-06).
+  static const Duration offlineSessionLimit = Duration(days: 7);
+
+  /// `true` bila profil terakhir diambil lebih dari 7 hari lalu.
+  static bool offlineSessionExpired(
+    int fetchedAt, {
+    DateTime? now,
+  }) {
+    final age = (now ?? DateTime.now()).millisecondsSinceEpoch - fetchedAt;
+    return age > offlineSessionLimit.inMilliseconds;
+  }
+
   final FirebaseAuth _auth;
   final FirebaseFirestore _firestore;
   final GoogleSignInAdapter _googleSignIn;
@@ -48,6 +60,7 @@ class AuthRepository {
   StreamSubscription<User?>? _subscription;
   AuthState _currentState = const AuthChecking();
   int _generation = 0;
+  String? _sessionMessage;
 
   Stream<AuthState> get stateChanges => _controller.stream;
 
@@ -56,6 +69,7 @@ class AuthRepository {
   AuthState get currentState => _currentState;
 
   Future<void> signInWithGoogle() async {
+    _sessionMessage = null;
     try {
       final token = await _googleSignIn.idToken();
       if (token == null) {
@@ -138,7 +152,7 @@ class AuthRepository {
 
   Future<AuthState> _resolve(User? user) async {
     if (user == null) {
-      return const AuthSignedOut();
+      return AuthSignedOut(message: _sessionMessage);
     }
 
     UserProfile? profile;
@@ -158,6 +172,17 @@ class AuthRepository {
           reason: DenialReason.profileUnavailable,
           email: user.email ?? '',
         );
+      }
+      final fetchedAt = await _cache.lastFetchedAt(user.uid);
+      if (fetchedAt == null || offlineSessionExpired(fetchedAt)) {
+        // Baris transaksi pending sengaja tidak dihapus: setelah login ulang
+        // dengan akun yang sama, outbox tetap melanjutkan pengiriman.
+        _sessionMessage =
+            'Sesi berakhir setelah offline lebih dari 7 hari. '
+            'Silakan masuk kembali.';
+        await _googleSignIn.signOut();
+        await _auth.signOut();
+        return AuthSignedOut(message: _sessionMessage);
       }
     }
 

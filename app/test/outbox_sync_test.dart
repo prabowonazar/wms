@@ -2,6 +2,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'package:warehouse_mobile/core/observability/telemetry.dart';
 import 'package:warehouse_mobile/core/transactions/outbox_sync.dart';
+import 'package:warehouse_mobile/core/transactions/transaction_remote.dart';
 import 'package:warehouse_mobile/core/transactions/transaction_repository.dart';
 
 import 'support/fake_transaction_remote.dart';
@@ -93,7 +94,7 @@ void main() {
     expect(result.sent, 0);
     expect(result.failed, 1);
     expect(result.remaining, 3);
-    expect(result.error, contains('tidak ada jaringan'));
+    expect(result.error, contains('Tidak ada koneksi'));
     expect(telemetry.events, contains(TelemetryEvents.outboxSyncFailed));
     expect(telemetry.errors, contains('outbox_sync_failed'));
 
@@ -132,5 +133,84 @@ void main() {
     expect(result.remaining, 0);
     expect(remote.stored, hasLength(300));
     expect(await repository.pendingCount(), 0);
+  });
+
+  test('percobaan otomatis berhenti setelah lima kali gagal', () async {
+    await seed(1);
+    remote.offline = true;
+
+    for (var i = 0; i < 6; i++) {
+      await outbox.flush();
+    }
+
+    final row = (await database.query('transactions')).single;
+    expect(row['sync_status'], 'failed');
+    expect(row['retry_count'], 5);
+    expect(row['next_retry_at'], isNull);
+    expect(remote.createCalls, 5);
+
+    // Putaran berikutnya tidak menyentuh jaringan lagi.
+    final idle = await outbox.flush();
+    expect(idle.sent, 0);
+    expect(remote.createCalls, 5);
+  });
+
+  test('retry manual membuka siklus percobaan baru', () async {
+    await seed(1);
+    remote.offline = true;
+    for (var i = 0; i < 5; i++) {
+      await outbox.flush();
+    }
+    final id = (await database.query('transactions')).single['transaction_id']!
+        as String;
+
+    remote.offline = false;
+    expect(await repository.retryNow(id), isTrue);
+
+    final result = await outbox.flush();
+    expect(result.sent, 1);
+    final row = (await database.query('transactions')).single;
+    expect(row['sync_status'], 'synced');
+    expect(row['retry_count'], 0);
+  });
+
+  test('penolakan server menandai baris failed permanen beserta alasannya',
+      () async {
+    await seed(1);
+    final id = (await database.query('transactions')).single['transaction_id']!
+        as String;
+    remote.serverStates[id] = const ServerTransactionState(
+      status: 'rejected',
+      rejectedReason: 'negative_stock',
+    );
+
+    final result = await outbox.flush();
+
+    expect(result.sent, 1);
+    expect(result.rejected, 1);
+    final row = (await database.query('transactions')).single;
+    expect(row['sync_status'], 'failed');
+    expect(row['retry_count'], 5);
+    expect(row['last_error'], contains('Server menolak: negative_stock'));
+    expect(row['next_retry_at'], isNull);
+  });
+
+  test('syncNow menarik penolakan untuk transaksi yang sudah terkirim',
+      () async {
+    await seed(1);
+    await outbox.flush();
+
+    final id = (await database.query('transactions')).single['transaction_id']!
+        as String;
+    remote.serverStates[id] = const ServerTransactionState(
+      status: 'rejected',
+      rejectedReason: 'stok tidak cukup di server',
+    );
+
+    await outbox.syncNow();
+
+    final row = (await database.query('transactions')).single;
+    expect(row['sync_status'], 'failed');
+    expect(row['last_error'], contains('stok tidak cukup di server'));
   });
 }

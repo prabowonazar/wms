@@ -58,4 +58,23 @@ class ProfileCache {
   Future<void> clear() async {
     await _db.delete('user_profile');
   }
+
+  /// Kapan profil terakhir berhasil diambil dari server (epoch ms UTC).
+  ///
+  /// Dipakai pembatas sesi offline (FR-AUTH-06): `null` bila belum pernah
+  /// tersimpan.
+  Future<int?> lastFetchedAt(String uid) async {
+    final rows = await _db.query(
+      'user_profile',
+      columns: ['fetched_at'],
+      where: 'uid = ?',
+      whereArgs: [uid],
+      limit: 1,
+    );
+    if (rows.isEmpty) {
+      return null;
+    }
+    final value = rows.first['fetched_at'];
+    return value is int ? value : null;
+  }
 }

@@ -11,10 +11,14 @@ class LoginScreen extends StatefulWidget {
     super.key,
     required this.auth,
     required this.telemetry,
+    this.message,
   });
 
   final AuthRepository auth;
   final Telemetry telemetry;
+
+  /// Pesan sesi berakhir (offline >7 hari) dari AuthGate.
+  final String? message;
 
   @override
   State<LoginScreen> createState() => _LoginScreenState();
@@ -102,6 +106,23 @@ class _LoginScreenState extends State<LoginScreen> {
                         ),
                       ),
                     ),
+                  if (message != null) ...[
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: theme.colorScheme.primaryContainer,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.lock_clock),
+                          const SizedBox(width: 8),
+                          Expanded(child: Text(message!)),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                  ],
                   FilledButton.icon(
                     onPressed: _busy ? null : _signIn,
                     icon: _busy

@@ -5,9 +5,15 @@ import 'package:warehouse_mobile/core/transactions/transaction_remote.dart';
 /// Remote palsu: menyimpan dokumen di memori dan bisa dibuat "offline".
 class FakeTransactionRemote implements TransactionRemote {
   final Map<String, StockTransaction> stored = <String, StockTransaction>{};
+
+  /// Status yang "dilaporkan server" untuk ID tertentu (mis. `rejected`).
+  final Map<String, ServerTransactionState> serverStates =
+      <String, ServerTransactionState>{};
+
   bool offline = false;
   int createCalls = 0;
   int alreadyExisted = 0;
+  int fetchCalls = 0;
 
   @override
   Future<TransactionPushResult> create(StockTransaction transaction) async {
@@ -21,6 +27,20 @@ class FakeTransactionRemote implements TransactionRemote {
     }
     stored[transaction.transactionId] = transaction;
     return TransactionPushResult.created;
+  }
+
+  @override
+  Future<Map<String, ServerTransactionState>> fetchStates(
+    List<String> transactionIds,
+  ) async {
+    fetchCalls++;
+    if (offline) {
+      throw StateError('tidak ada jaringan');
+    }
+    return <String, ServerTransactionState>{
+      for (final id in transactionIds)
+        if (serverStates.containsKey(id)) id: serverStates[id]!,
+    };
   }
 }
 

@@ -291,4 +291,149 @@ void main() {
     );
     expect(afterRetry.single.transactionId, 'tx-retry');
   });
+
+  test('ringkasan sync memisahkan pending dan failed', () async {
+    await record(qty: 1, id: 'tx-a');
+    await record(qty: 1, id: 'tx-b');
+    await repository.markSyncing('tx-b');
+    await repository.markFailed('tx-a', 'Tidak ada koneksi.');
+
+    final summary = await repository.syncSummary();
+
+    expect(summary.pending, 0);
+    expect(summary.syncing, 1);
+    expect(summary.failed, 1);
+    expect(summary.unsynced, 2);
+    expect(summary.allClear, isFalse);
+    expect(summary.failedItems.single.transactionId, 'tx-a');
+    expect(summary.failedItems.single.lastError, 'Tidak ada koneksi.');
+    expect(summary.chipLabel, contains('perlu tindakan'));
+  });
+
+  test('histori memfilter tanggal, jenis, produk, dan operator', () async {
+    await record(
+      qty: 4,
+      id: 'tx-in',
+      now: DateTime.utc(2026, 11, 17, 2),
+    );
+    await record(
+      type: TransactionType.outgoing,
+      qty: 1,
+      id: 'tx-out',
+      now: DateTime.utc(2026, 11, 18, 2),
+    );
+    await record(
+      qty: 2,
+      id: 'tx-sv',
+      profile: supervisor,
+      now: DateTime.utc(2026, 11, 18, 4),
+    );
+
+    final all = await repository.history();
+    expect(all.map((row) => row.transactionId),
+        ['tx-sv', 'tx-out', 'tx-in']);
+
+    final outgoing = await repository.history(type: TransactionType.outgoing);
+    expect(outgoing.single.transactionId, 'tx-out');
+
+    final mine = await repository.history(userId: operatorProfile.uid);
+    expect(mine.map((row) => row.transactionId), ['tx-out', 'tx-in']);
+
+    final recent = await repository.history(
+      from: DateTime.utc(2026, 11, 18),
+      to: DateTime.utc(2026, 11, 19),
+    );
+    expect(recent.map((row) => row.transactionId), ['tx-sv', 'tx-out']);
+
+    final byCode = await repository.history(query: 'BRG-00');
+    expect(byCode, hasLength(3));
+
+    final page = await repository.history(limit: 1, offset: 1);
+    expect(page.single.transactionId, 'tx-out');
+  });
+
+  test('pembatalan membuat reversal dan mengembalikan saldo', () async {
+    final original = await record(qty: 5, id: 'tx-original');
+    await repository.markSynced('tx-original');
+
+    final reversal = await repository.recordReversal(
+      original: original,
+      profile: supervisor,
+      reason: 'salah input qty oleh operator',
+      transactionId: 'tx-reversal',
+      now: DateTime.utc(2026, 11, 18, 3),
+    );
+
+    expect(reversal.type, TransactionType.reversal);
+    expect(reversal.signedQty, -5);
+    expect(reversal.refTransactionId, 'tx-original');
+    expect(reversal.note, 'salah input qty oleh operator');
+    expect(reversal.syncStatus, 'pending');
+    expect(await repository.hasReversal('tx-original'), isTrue);
+    expect((await repository.balanceFor('p1')).endingQty, 0);
+  });
+
+  test('pembatalan ganda dan oleh operator ditolak', () async {
+    final original = await record(qty: 5, id: 'tx-original');
+    await repository.markSynced('tx-original');
+    await repository.recordReversal(
+      original: original,
+      profile: supervisor,
+      reason: 'salah input qty oleh operator',
+      transactionId: 'tx-reversal',
+    );
+
+    await expectLater(
+      repository.recordReversal(
+        original: original,
+        profile: supervisor,
+        reason: 'percobaan kedua yang tidak boleh lolos',
+        transactionId: 'tx-reversal-2',
+      ),
+      throwsA(isA<InvalidMovementException>()),
+    );
+    await expectLater(
+      repository.recordReversal(
+        original: original,
+        profile: operatorProfile,
+        reason: 'operator tidak berhak membatalkan',
+      ),
+      throwsA(isA<InvalidMovementException>()),
+    );
+    expect((await database.query('transactions')).length, 2);
+  });
+
+  test('pembatalan menolak alasan pendek dan transaksi belum terkirim',
+      () async {
+    final original = await record(qty: 5, id: 'tx-original');
+
+    await expectLater(
+      repository.recordReversal(
+        original: original,
+        profile: supervisor,
+        reason: 'kurang',
+      ),
+      throwsA(isA<InvalidMovementException>()),
+    );
+    await expectLater(
+      repository.recordReversal(
+        original: original,
+        profile: supervisor,
+        reason: 'alasan yang sebenarnya sudah cukup panjang',
+      ),
+      throwsA(isA<InvalidMovementException>()),
+    );
+  });
+
+  test('hanya baris failed yang boleh dihapus dari antrean', () async {
+    await record(qty: 1, id: 'tx-failed');
+    await repository.markFailed('tx-failed', 'Tidak ada koneksi.');
+    await record(qty: 1, id: 'tx-synced');
+    await repository.markSynced('tx-synced');
+
+    expect(await repository.discardFailed('tx-synced'), isFalse);
+    expect(await repository.discardFailed('tx-failed'), isTrue);
+    final rows = await database.query('transactions');
+    expect(rows.single['transaction_id'], 'tx-synced');
+  });
 }

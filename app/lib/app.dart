@@ -93,9 +93,10 @@ class _AuthGateState extends State<_AuthGate> {
         final state = snapshot.data ?? const AuthChecking();
         return switch (state) {
           AuthChecking() => const SplashScreen(),
-          AuthSignedOut() => LoginScreen(
+          AuthSignedOut(:final message) => LoginScreen(
               auth: widget.services.auth,
               telemetry: widget.services.telemetry,
+              message: message,
             ),
           AuthDenied(:final reason, :final email, :final detail) => DeniedScreen(
               auth: widget.services.auth,

@@ -14,6 +14,29 @@ enum TransactionPushResult {
 /// Pengiriman satu transaksi ke penyimpanan pusat.
 abstract class TransactionRemote {
   Future<TransactionPushResult> create(StockTransaction transaction);
+
+  /// Membaca status akhir dari server untuk [transactionIds].
+  ///
+  /// Dipakai VS-3 untuk menarik keputusan Function `applyBalance`: transaksi
+  /// bisa diterima (`applied`) atau ditolak (`rejected`) setelah dibuat.
+  /// Dokumen yang belum diproses tidak dikembalikan.
+  Future<Map<String, ServerTransactionState>> fetchStates(
+    List<String> transactionIds,
+  );
+}
+
+/// Status transaksi versi server (subset yang dibutuhkan device).
+class ServerTransactionState {
+  const ServerTransactionState({
+    required this.status,
+    this.rejectedReason,
+  });
+
+  /// `applied` atau `rejected` (nilai lain diabaikan pemanggil).
+  final String status;
+  final String? rejectedReason;
+
+  bool get isRejected => status == 'rejected';
 }
 
 /// Implementasi Firestore dengan semantik **create-only**.
@@ -25,6 +48,9 @@ class FirestoreTransactionRemote implements TransactionRemote {
   FirestoreTransactionRemote(this._firestore);
 
   final FirebaseFirestore _firestore;
+
+  /// Batas `whereIn` Firestore adalah 30 nilai.
+  static const int _chunkSize = 30;
 
   @override
   Future<TransactionPushResult> create(StockTransaction transaction) async {
@@ -40,6 +66,38 @@ class FirestoreTransactionRemote implements TransactionRemote {
       tx.set(reference, payload);
       return TransactionPushResult.created;
     });
+  }
+
+  @override
+  Future<Map<String, ServerTransactionState>> fetchStates(
+    List<String> transactionIds,
+  ) async {
+    final result = <String, ServerTransactionState>{};
+    if (transactionIds.isEmpty) {
+      return result;
+    }
+
+    for (var start = 0; start < transactionIds.length; start += _chunkSize) {
+      final end = (start + _chunkSize).clamp(0, transactionIds.length);
+      final chunk = transactionIds.sublist(start, end);
+      final snapshot = await _firestore
+          .collection('transactions')
+          .where(FieldPath.documentId, whereIn: chunk)
+          .get();
+      for (final doc in snapshot.docs) {
+        final data = doc.data();
+        final status = data['serverStatus'];
+        if (status is! String) {
+          continue;
+        }
+        final reason = data['rejectedReason'];
+        result[doc.id] = ServerTransactionState(
+          status: status,
+          rejectedReason: reason is String ? reason : null,
+        );
+      }
+    }
+    return result;
   }
 }
 

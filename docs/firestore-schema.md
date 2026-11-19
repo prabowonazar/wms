@@ -167,7 +167,7 @@ menolak semua akses klien.
 | `refTransactionId` | string | ❌ | Wajib untuk `reversal` (BR-06) |
 | `cycleCountId` | string | ❌ | Wajib untuk `adjustment` dari cycle-count |
 | `approval` | map | ❌ | `{ status: 'not_required'\|'pending'\|'approved'\|'rejected', approvedBy, approvedAt, reason }`. Client hanya boleh mengirim `status='pending'` + `reason` (≥10 karakter) saat override stok negatif; keputusan akhir ditulis Function |
-| `serverStatus` | string | ✅ | `applied` \| `awaiting_approval` \| `rejected` — ditulis Function |
+| `serverStatus` | string | ✅ | `applied` \| `awaiting_approval` \| `rejected` — ditulis Function. VS-2 baru menulis `applied`/`rejected`; `awaiting_approval` disiapkan untuk alur approval VS-5 |
 | `appVersion` | string | ✅ | Diagnostik |
 | `source` | string | ✅ | `scan` \| `manual` \| `cycle_count` \| `server` |
 

@@ -23,6 +23,10 @@ class TelemetryEvents {
   static const String transactionSaved = 'transaction_saved';
   static const String outboxSyncCompleted = 'outbox_sync_completed';
   static const String outboxSyncFailed = 'outbox_sync_failed';
+
+  /// VS3-05/VS3-06: pembatalan dan status histori.
+  static const String transactionReversed = 'transaction_reversed';
+  static const String syncStarted = 'sync_started';
 }
 
 /// Titik masuk tunggal untuk analytics & crash reporting.
