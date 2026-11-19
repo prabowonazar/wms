@@ -262,6 +262,24 @@ flutter build apk --debug --dart-define-from-file=dart_defines/dev.json
 Bila ada key yang kurang, aplikasi menampilkan layar
 "Konfigurasi Firebase belum lengkap" beserta daftar key (tidak crash).
 
+### 5.1 Rahasia ekspor Sheets (VS-4)
+
+Kredensial **tidak** disimpan di repo. Dua Firebase Secret dipakai job
+`exportDailySheet` dan `reconcileSheet`:
+
+```powershell
+firebase functions:secrets:set SHEETS_SERVICE_ACCOUNT
+firebase functions:secrets:set SHEETS_SPREADSHEET_ID
+firebase deploy --only functions
+```
+
+`SHEETS_SERVICE_ACCOUNT` adalah seluruh JSON service account (newline private
+key boleh ditulis literal `\\n`). Service account harus diberi akses **Editor**
+pada spreadsheet yang ID-nya ada di `SHEETS_SPREADSHEET_ID`. Tanpa kedua
+secret, job mencatat peringatan dan dilewati — aplikasi tetap berjalan.
+Right Spreadsheet harus memiliki tab bernama `YYYY-MM` (mis. `2026-11`);
+job membuat header bila tab masih kosong.
+
 ---
 
 ## 6. Emulator lokal (VS0-02)
