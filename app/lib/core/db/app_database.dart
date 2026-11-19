@@ -48,7 +48,10 @@ class AppDatabase {
   /// Pengaturan yang tidak boleh berada di dalam transaksi pembuatan skema.
   static Future<void> _configure(Database db) async {
     await db.execute('PRAGMA foreign_keys = ON');
-    await db.execute('PRAGMA journal_mode = WAL');
+    // `journal_mode` mengembalikan satu baris hasil. Di Android, sqflite
+    // menolak `execute()` untuk query yang menghasilkan baris, jadi wajib
+    // `rawQuery()` (di FFI test perbedaan ini tidak terlihat).
+    await db.rawQuery('PRAGMA journal_mode = WAL');
     await db.execute('PRAGMA busy_timeout = 5000');
   }
 }

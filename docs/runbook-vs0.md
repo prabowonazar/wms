@@ -604,6 +604,7 @@ Riwayat CI (semua kegagalan sudah diperbaiki dan dibuktikan ulang):
 | `permission-denied` saat baca profil | Rules lama ter-deploy | `firebase deploy --only firestore:rules` |
 | DB gagal dibuka / "file is not a database" | Kunci berubah atau file rusak | Jangan hapus data; pulihkan kunci/backup, hubungi tech lead |
 | `database is locked` | Dua proses menulis bersamaan | Pastikan hanya satu isolate menulis; WAL + `busy_timeout` sudah aktif |
+| `Queries can be performed using SQLiteDatabase query or rawQuery methods only. sql 'PRAGMA journal_mode = WAL'` | `onConfigure` memakai `execute()` untuk PRAGMA yang mengembalikan baris (lolos di FFI, gagal di Android) | Gunakan `rawQuery('PRAGMA journal_mode = WAL')` — sudah diperbaiki di `app_database.dart` |
 | `flutter test` FFI gagal di Windows | `sqlite3.dll` tidak ditemukan | Jalankan di CI Ubuntu atau pasang DLL resmi |
 | Emulator rules gagal start | Java bukan 17 | Set `JAVA_HOME` ke JDK 17 |
 | App tidak connect ke emulator di device fisik | `10.0.2.2` hanya untuk emulator Android | Pakai IP LAN host + `EMULATOR_HOST` |
