@@ -293,6 +293,28 @@ test Functions lulus.
 
 **Exit (pilot gate):** semua angka pada §9 terukur, 0 bug P0/P1, operator bisa memakai tanpa pendampingan developer.
 
+**Status implementasi (19 Nov 2026; menunggu CI):**
+
+| Area | Kode | Bukti | Device |
+|---|---|---|---|
+| Closing harian | `lib/period-close.js` + job `closeDailyPeriod` 00:05 WIB; idempoten (periode `closed` dilewati), snapshot + checksum + audit | unit test | **belum** (butuh scheduler di project dev) |
+| Stock card | SCR-13 memakai snapshot server bila periode `closed`, otherwise ledger lokal berlabel "sementara" | unit test | **belum** |
+| Ekspor Sheets | `lib/sheet-export.js` + `sheets-client.js` + job `exportDailySheet` 02:00 WIB; idempoten per `transactionId`, retry 3×, `sheetExports` | unit test | **belum** (butuh 2 Firebase Secret + Sheet) |
+| Rekonsiliasi | `reconcile()` → `verified`/`partial`/`tampered` + job 02:30 WIB + audit | unit test | **belum** |
+| Admin | callable `adminUpdateUser`, `adminListFailed`, `adminForceRetry` + layar Admin (khusus peran admin) | unit test | **belum** |
+| Dashboard | metrik total produk, transaksi hari ini, perlu restock | unit test | **belum** |
+| PDF/CSV | **Dipotong** sesuai catatan tiket Should (VS4-07) | — | — |
+
+> **Keterbatasan VS-4:**
+> 1. Firebase Secret `SHEETS_SERVICE_ACCOUNT` dan `SHEETS_SPREADSHEET_ID`
+>    wajib diset agar job ekspor/rekonsiliasi aktif. Tanpa itu job hanya
+>    mencatat peringatan; tidak ada kredensial di repo.
+> 2. Retry ekspor memakai jeda 5 s/15 s agar selesai dalam batas timeout
+>    function. Retry 5/15/45 menit seperti di PRD perlu queue terpisah.
+> 3. Export PDF/CSV (Should) sengaja dipotong; Sheets tetap menjadi satu-satunya
+>    jalur ekspor pada pilot.
+> 4. WorkManager (VS2-03) dan pembuktian angka NFR masih terbuka.
+
 ---
 
 ### VS-5 — Cycle count → adjustment → approval

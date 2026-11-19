@@ -40,6 +40,8 @@
 | Sync (VS-3) | `app/lib/features/sync/**`, `core/transactions/sync_policy.dart` | SCR-20: status per transaksi, backoff 5×, sync manual, tarik penolakan server |
 | Histori (VS-3) | `app/lib/features/history/**` | SCR-10/11: filter, pagination, detail, reversal supervisor |
 | Beranda (VS-3) | `app/lib/features/home/home_shell.dart` | Navigasi Scan/Histori/Stok/Lainnya + chip status sync |
+| Laporan (VS-4) | `firebase/functions/lib/period-close.js`, `sheet-export.js`, `sheets-client.js` | Closing 00:05, ekspor 02:00, rekonsiliasi 02:30 WIB |
+| Admin (VS-4) | `app/lib/core/admin/**`, `features/admin/**` | Callable user & retry paksa, layar monitoring admin |
 | CI | `.github/workflows/ci.yml` | analyze/test/APK, Functions, rules emulator |
 | Verifikasi | `tools/verify-vs0.ps1` | Pemeriksaan statis + opsi `-RunTests` |
 | Verifikasi skema | `tools/verify-schema-sqlite.ps1` | Menjalankan `sqlite_schema.sql` di SQLite 3.43.2 nyata (Windows, tanpa toolchain) |
@@ -389,8 +391,14 @@ node --test test/
 ```
 
 CI tidak menjalankan `npm install` untuk Functions karena hanya menguji logika murni;
-deploy tetap membutuhkan dependency. `test/apply-balance.test.js` menguji keputusan
-saldo/override/replay/reversal tanpa emulator (14 kasus).
+deploy tetap membutuhkan dependency.
+
+| File | Cakupan |
+|---|---|
+| `test/apply-balance.test.js` | saldo, override, replay, reversal, konflik (15 kasus) |
+| `test/period-close.test.js` | WIB, D-1, checksum, stock card seimbang, snapshot (5 kasus) |
+| `test/sheet-export.test.js` | baris applied, idempotensi, rekonsiliasi verified/partial/tampered (5 kasus) |
+| `test/admin.test.js` | izin admin, validasi perubahan user, validasi retry (3 kasus) |
 
 ---
 
@@ -787,5 +795,61 @@ Prasyarat: §15 sudah jalan dan indeks gabungan `transactions`
 
 Semua tiket VS-3 sudah punya kode dan bukti test; angka NFR dan G3 baru
 terbukti setelah demo device di atas dijalankan.
+
+---
+
+## 17. Demo VS-4 (closing, stock card, Sheets, admin)
+
+Prasyarat: secret Sheets sudah di-set (§5.1), indeks Firestore terbaru di-deploy,
+dan project dev memiliki Spreadsheet dengan tab `YYYY-MM` berjalan.
+
+```powershell
+cd firebase
+firebase deploy --only functions,firestore:indexes
+```
+
+### 17.1 Closing & stock card
+
+1. Pastikan ada transaksi `applied` untuk produk `p1` pada hari ini.
+2. Ubah jam sistem ke besok 00:06 WIB atau panggil `closeDailyPeriod` manual
+   dari Firebase Console. Periksa:
+   - `warehouses/{wh}/periods/{D-1}.status = 'closed'`;
+   - `stockCards/{productId}` memuat `opening + masuk − keluar + adj = ending`;
+   - `snapshotChecksum` tidak kosong; `auditLogs` memuat `period.closed`.
+3. Panggil lagi jobnya → tidak ada dokumen baru (idempoten).
+4. Di device, buka **Stok → Kartu stok**, pilih periode D-1: label harus
+   "Periode tertutup · snapshot server (read-only)" dan angka sama dengan
+   Firestore. Pilih hari ini: label "Sementara · belum closing".
+
+### 17.2 Ekspor & rekonsiliasi
+
+1. Panggil `exportDailySheet` manual. `sheetExports/{period}_1` harus
+   `status=success`, `rowCount` sama dengan jumlah transaksi applied,
+   `duplicateRows=0`.
+2. Panggil lagi → tidak ada baris baru di Sheet (idempoten per `TransactionID`).
+3. Panggil `reconcileSheet` → `reconciliation.status = 'verified'`.
+4. Edit manual satu sel di Sheet lalu jalankan rekonsiliasi lagi →
+   status `tampered` + `auditLogs` `export.reconciled`.
+5. Hapus satu baris → status `partial` dengan `missingCount = 1`.
+
+### 17.3 Admin
+
+1. Login sebagai **admin**, buka **Lainnya → Admin**.
+2. Buat transaksi ditolak (mis. override dengan role diturunkan), lalu
+   **Retry paksa** dengan alasan ≥10 karakter → `serverStatus='applied'`
+   dan `auditLogs` memuat `transaction.force_retry`.
+3. Ubah role user di tab **Kelola user** → `users/{uid}` berubah dan
+   `auditLogs` memuat `user.role.update`.
+4. Coba sebagai supervisor/operator: menu Admin tidak tampil dan callable
+   ditolak `permission-denied`.
+
+### 17.4 Dashboard
+
+1. Buka **Lainnya → Dashboard**: angka total produk = jumlah dokumen `products`,
+   transaksi hari ini = jumlah transaksi periode WIB berjalan, dan jumlah
+   perlu restock = produk dengan `saldo <= min_stock`.
+2. Catat waktu tampil (target ≤2 s pada device mid-range).
+
+> Ekspor PDF/CSV (VS4-07) sengaja dipotong; Sheets adalah jalur ekspor pilot.
 
 
