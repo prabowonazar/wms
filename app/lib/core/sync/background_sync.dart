@@ -97,10 +97,7 @@ class BackgroundSync {
     if (_initialized) {
       return;
     }
-    await Workmanager().initialize(
-      callbackDispatcher,
-      isInDebugMode: false,
-    );
+    await Workmanager().initialize(callbackDispatcher);
     await Workmanager().cancelByUniqueName(backgroundFlushTask);
     await Workmanager().registerPeriodicTask(
       backgroundFlushTask,
