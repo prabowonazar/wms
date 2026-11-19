@@ -151,7 +151,7 @@ class _HomeShellState extends State<HomeShell> {
   Future<void> _openAdmin() async {
     await Navigator.of(context).push(
       MaterialPageRoute<void>(
-        builder: (_) => AdminScreen(remote: const AdminRemote()),
+        builder: (_) => const AdminScreen(remote: AdminRemote()),
       ),
     );
   }

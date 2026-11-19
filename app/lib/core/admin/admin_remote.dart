@@ -85,7 +85,7 @@ class AdminRemote {
     if (items is! List) {
       return const <FailedServerTransaction>[];
     }
-    return items.whereType<Map>().map((raw) {
+    return items.whereType<Map<String, Object?>>().map((raw) {
       return FailedServerTransaction(
         transactionId: (raw['transactionId'] as String?) ?? '',
         productLabel: [
