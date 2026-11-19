@@ -493,11 +493,11 @@ Jangan commit: `dart_defines/`, `google-services.json`, service account, `*.jks`
 | Tidak ada kredensial ter-commit | Ya |
 | Skrip ASCII | Ya |
 | `flutter pub get` | **Lolos di CI** (Flutter 3.32.5; `sqflite_sqlcipher` dipin 3.3.0) |
-| `flutter analyze` | **Bersih di CI** - `No issues found!` (run #31) |
-| `flutter test` | **107 test lolos di CI** (VS-1: 60; VS-2: 30; VS-3: 15; VS-4: 2) |
+| `flutter analyze` | **Bersih di CI** - `No issues found!` (run #36) |
+| `flutter test` | **112 test lolos di CI** (VS-1: 60; VS-2: 30; VS-3: 15; VS-4: 2; VS-5: 5) |
 | Build APK Android | **Lolos di CI** sebagai smoke build (Android di-scaffold, minSdk 26, compileSdk 36, NDK 27); bukan bukti konfigurasi final |
 | Rules test emulator | **41 kasus lolos di CI** (VS-3 menambah 4 kasus resolusi konflik) |
-| Functions unit test | **41 test lolos di CI** (12 VS-1 + 15 `apply-balance` + 5 closing + 6 Sheet + 3 admin) |
+| Functions unit test | **47 test lolos di CI** (12 VS-1 + 15 `apply-balance` + 5 closing + 6 Sheet + 3 admin + 6 cycle-count) |
 | Versi paket terkunci (`pubspec.lock`) | Diambil dari artifact CI lalu di-commit (77 paket) |
 | Login Google nyata di device | **Belum dijalankan** (butuh project dev + SHA-1) |
 | SQLCipher di device | **Belum dibuktikan** (baru desain + test non-enkripsi via FFI) |
@@ -507,16 +507,16 @@ Jangan commit: `dart_defines/`, `google-services.json`, service account, `*.jks`
 | Core loop VS-2 (simpan ≤1,5 s, offline → synced, saldo turun) | **Belum dibuktikan di device**; baru unit/widget test dengan remote palsu |
 | Exactly-once VS-2 (300 transaksi, replay, drift 0) | **Belum dibuktikan end-to-end**; unit test remote palsu lulus, trigger Firestore belum dijalankan di emulator |
 
-> Angka 107/41/41 dibuktikan oleh CI run #31 (`abe6ab2`) yang keempat job-nya
+> Angka 112/41/47 dibuktikan oleh CI run #36 (`4345ead`) yang keempat job-nya
 > hijau. Bila CI menampilkan angka berbeda, perbaiki tabel ini pada commit yang
 > sama dengan perbaikannya.
 
-Bukti CI terakhir: run #31 (`abe6ab2`) keempat job hijau. Detail per job:
+Bukti CI terakhir: run #36 (`4345ead`) keempat job hijau. Detail per job:
 
-- `Flutter analyze & test`: `No issues found!` + 107 test lulus, coverage terunggah.
+- `Flutter analyze & test`: `No issues found!` + 112 test lulus, coverage terunggah.
 - `Build debug APK`: `app-debug.apk` terbangun dan terunggah sebagai artifact.
 - `Firestore rules test`: 41 kasus lulus.
-- `Functions syntax & unit test`: 41 test lulus.
+- `Functions syntax & unit test`: 47 test lulus.
 
 Riwayat CI (semua kegagalan sudah diperbaiki dan dibuktikan ulang):
 
@@ -551,6 +551,11 @@ Riwayat CI (semua kegagalan sudah diperbaiki dan dibuktikan ulang):
 | #29 | gagal | `dart:async` di layar Admin, raw type, dan `prefer_const_constructors` |
 | #30 | — | commit perantara `6b38ab9` (dokumen VS-4, tidak dipantau terpisah) |
 | #31 | **hijau** | bukti VS-4: analyze bersih, 107 test, APK, 41 rules, 41 Functions |
+| #32 | **hijau** | dokumen bukti VS-4 |
+| #33 | gagal | `auth_models.dart` tidak dipakai + `const` pada remote cycle count |
+| #34 | — | commit perantara `3573edd` (dokumen VS-5, tidak dipantau terpisah) |
+| #35 | gagal | 111 lulus, 1 gagal: test mengira submit hanya menghasilkan satu baris |
+| #36 | **hijau** | bukti VS-5: analyze bersih, 112 test, APK, 41 rules, 47 Functions |
 
 ---
 

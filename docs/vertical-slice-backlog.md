@@ -340,7 +340,7 @@ test Functions lulus.
 
 **Exit (G5):** 3 sesi nyata di gudang uji; selisih saldo vs fisik **0**; audit lengkap.
 
-**Status implementasi (19 Nov 2026; menunggu CI):**
+**Status implementasi (19 Nov 2026; CI run #36 hijau):**
 
 | Area | Kode | Bukti | Device |
 |---|---|---|---|
