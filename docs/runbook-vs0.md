@@ -496,7 +496,7 @@ Jangan commit: `dart_defines/`, `google-services.json`, service account, `*.jks`
 | Tidak ada kredensial ter-commit | Ya |
 | Skrip ASCII | Ya |
 | `flutter pub get` | **Lolos di CI** (Flutter 3.32.5; `sqflite_sqlcipher` dipin 3.3.0) |
-| `flutter analyze` | **Bersih di CI** - `No issues found!` (run #45) |
+| `flutter analyze` | **Bersih di CI** - `No issues found!` (run #46) |
 | `flutter test` | **112 test lolos di CI** (VS-1: 60; VS-2: 30; VS-3: 15; VS-4: 2; VS-5: 5) |
 | Build APK Android | **Lolos di CI** sebagai smoke build (Android di-scaffold, minSdk 26, compileSdk 36, NDK 27); bukan bukti konfigurasi final |
 | Rules test emulator | **46 kasus lolos di CI** (VS-6 menambah 5 kasus koleksi pendukung) |
@@ -510,11 +510,12 @@ Jangan commit: `dart_defines/`, `google-services.json`, service account, `*.jks`
 | Core loop VS-2 (simpan ≤1,5 s, offline → synced, saldo turun) | **Belum dibuktikan di device**; baru unit/widget test dengan remote palsu |
 | Exactly-once VS-2 (300 transaksi, replay, drift 0) | **Belum dibuktikan end-to-end**; unit test remote palsu lulus, trigger Firestore belum dijalankan di emulator |
 
-> Angka 112/46/51 dibuktikan oleh CI run #45 (`4cb460c`) yang keempat job-nya
-> hijau. Bila CI menampilkan angka berbeda, perbaiki tabel ini pada commit yang
-> sama dengan perbaikannya.
+> Angka 112/46/51 dibuktikan oleh CI run #46 (`5f56982`) yang keempat job-nya
+> hijau (job APK sempat gagal karena HTTP 429 Maven Central, lalu di-rerun).
+> Bila CI menampilkan angka berbeda, perbaiki tabel ini pada commit yang sama
+> dengan perbaikannya.
 
-Bukti CI terakhir: run #45 (`4cb460c`) keempat job hijau. Detail per job:
+Bukti CI terakhir: run #46 (`5f56982`) keempat job hijau. Detail per job:
 
 - `Flutter analyze & test`: `No issues found!` + 112 test lulus, coverage terunggah.
 - `Build debug APK`: `app-debug.apk` terbangun dan terunggah sebagai artifact.
@@ -568,6 +569,7 @@ Riwayat CI (semua kegagalan sudah diperbaiki dan dibuktikan ulang):
 | #43 | gagal | `isInDebugMode` deprecated + apple/interface 0.9.4 bentrok |
 | #44 | gagal | workmanager_android 0.9.3 butuh interface 0.9.4 (ForegroundServiceConfig) |
 | #45 | **hijau** | WorkManager 0.8.0: 112 test, APK, 46 rules, 51 Functions |
+| #46 | **hijau** | lock workmanager; APK di-rerun setelah HTTP 429 Maven Central |
 
 ---
 
