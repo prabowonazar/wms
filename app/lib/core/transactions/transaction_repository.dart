@@ -214,7 +214,7 @@ class TransactionRepository {
       'transactions',
       where: "sync_status IN ('pending','syncing') "
           "OR (sync_status = 'failed' "
-          "AND (next_retry_at IS NULL OR next_retry_at <= ?))",
+          'AND (next_retry_at IS NULL OR next_retry_at <= ?))',
       whereArgs: [reference],
       orderBy: 'occurred_at ASC',
       limit: limit,
@@ -224,7 +224,7 @@ class TransactionRepository {
 
   Future<int> pendingCount() async {
     final rows = await _database.rawQuery(
-      "SELECT COUNT(*) AS total FROM transactions "
+      'SELECT COUNT(*) AS total FROM transactions '
       "WHERE sync_status <> 'synced'",
     );
     return _int(rows.first['total']);
