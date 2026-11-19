@@ -149,7 +149,9 @@ void main() {
 
     expect(result.autoApproved, isFalse);
     expect(result.session.status, CycleCountStatus.submitted);
-    expect((await repository.lines(session.id)).single.variance, -3);
+    final afterSubmit = await repository.lines(session.id);
+    expect(afterSubmit, hasLength(2));
+    expect(afterSubmit.firstWhere((line) => line.productId == 'p1').variance, -3);
     expect(
       repository.saveLine(
         session: result.session,
