@@ -579,7 +579,7 @@ Riwayat CI (semua kegagalan sudah diperbaiki dan dibuktikan ulang):
 | Login Google di emulator | Tidak bisa diuji end-to-end | Demo login di project dev; emulator untuk rules/Firestore |
 | Analytics debug tidak muncul | Bukti VS0-06 kurang | `setprop debug.firebase.analytics.app` + tunggu beberapa menit |
 | Data lama tidak bisa dibuka bila kunci hilang | Outbox hilang | Jangan hapus app; jangan rotasi kunci; dokumentasikan ke operator |
-| Outbox hanya timer foreground (bukan WorkManager) | Transaksi tertunda lebih lama bila app dibunuh OS | Flush saat app dibuka + setelah simpan sudah ada; ganti WorkManager (VS2-03) sebelum rilis lapangan |
+| WorkManager tertunda di device OEM agresif | Transaksi tertunda lebih lama | Uji 2 merek; sync manual (SCR-20) dan flush saat app dibuka tetap tersedia |
 | Transaksi ditolak server belum ditarik ke device | Saldo lokal > server sampai rekonsiliasi VS-3 | Catat sebagai keterbatasan VS-2; jangan klaim drift 0 sebelum VS-3 |
 
 ---
@@ -930,11 +930,24 @@ di-deploy; akun Supervisor/Admin tersedia.
 
 Buka [`rollout-checklist.md`](rollout-checklist.md) untuk target NFR/M1-M7,
 prosedur pengukuran device, audit aksesibilitas, latihan backup/restore, seeding
-100 SKU, dan daftar utang (WorkManager, tab konflik, PDF/CSV, M5 otomatis).
+100 SKU, dan daftar utang (tab konflik, PDF/CSV, M5 otomatis).
 
 Ringkasnya: CI membuktikan kompilasi, 46 kasus rules, dan seluruh unit/widget
 test. CI **tidak** membuktikan angka performa, kontras AA, RTO/RPO, maupun
 kesiapan tim — semuanya wajib diisi dari project dev sebelum pilot.
+
+### 19.1 WorkManager (VS2-03)
+
+`BackgroundSync.initialize()` mendaftarkan task `vs2OutboxFlush` (periodik 15
+menit, constraint jaringan) saat HomeScreen dibuat. Callback di isolate
+terpisah membuka Firebase + SQLCipher dengan kunci dari Keystore, lalu
+mengosongkan outbox transaksi **dan** sesi cycle-count. Timer foreground 60
+detik sudah dihapus; flush saat app dibuka dan setelah simpan tetap ada.
+
+Bukti yang perlu dicatat di device: kill aplikasi saat airplane mode, buat
+transaksi, aktifkan jaringan, lalu amati logcat `WM-WorkerWrapper` untuk
+eksekusi task dan dokumen Firestore bertambah tanpa membuka aplikasi.
+
 
 
 

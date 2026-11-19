@@ -205,19 +205,16 @@ test Functions lulus.
 |---|---|---|---|
 | Lembar transaksi | `MovementSheet` (SCR-04) + `ProductSheet` (SCR-13); qty default 1 sehingga scan → Keluar → Simpan = 3 tap | 5 widget test lulus | **belum** |
 | Submit idempoten | `Uuid7` + `TransactionRepository.recordMovement` (satu transaksi SQLite, PK `transaction_id`) | 14 unit test + 5 test UUID | **belum** (tap ganda & force-stop belum diuji nyata) |
-| Outbox | `OutboxSyncService`: flush saat app dibuka, setelah simpan, lalu tiap 60 detik selama app di depan. **Bukan WorkManager** | 6 unit test (termasuk 300 transaksi + replay) | **belum** |
+| Outbox | `OutboxSyncService` + `BackgroundSync` (WorkManager 15 menit, constraint jaringan): flush saat app dibuka, setelah simpan, dan di background | 6 unit test (300 transaksi + replay) | **belum** |
 | Function `applyBalance` | `lib/apply-balance.js` + trigger `onDocumentCreated`; replay guard `lastTransactionId` | 10 unit test Functions | **belum** (butuh project dev; emulator belum menjalankan trigger) |
 | Stok negatif & override | SCR-08 + dialog SCR-09; hanya supervisor/admin; alasan wajib ≥10 karakter; `approval.pending` diputuskan server | 2 unit + 5 widget test + 2 test rules | **belum** |
 | Saldo & stock card lokal | `v_product_balance` + `v_stock_card` + layar stok (SCR-12) | 14 unit test + 2 test view skema | **belum** (NFR ≤1 s belum diukur) |
 
 > **Keterbatasan VS-2 yang disengaja:**
-> 1. Outbox memakai timer foreground, **bukan WorkManager**. Bila app dibunuh
->    sebelum timer jalan, transaksi tetap aman di SQLite tetapi baru terkirim
->    saat app dibuka lagi. Penggantian ke WorkManager adalah tiket VS2-03 dan
->    wajib selesai sebelum rilis lapangan.
-> 2. Transaksi yang ditolak server (`serverStatus='rejected'`) belum ditarik
->    kembali ke device, sehingga saldo lokal bisa lebih tinggi daripada server
->    sampai rekonsiliasi di VS-3.
+> 1. WorkManager sudah dipakai (VS2-03), tetapi belum diuji pada device OEM
+>    agresif yang membatasi task background. Sync manual (VS3-02) tetap tersedia.
+> 2. Transaksi yang ditolak server kini ditarik di VS-3 lewat `fetchStates`,
+>    jadi batasan lama tentang `serverStatus='rejected'` sudah tertutup.
 > 3. Exactly-once baru dibuktikan lewat unit test dan fake remote; pembuktian
 >    end-to-end (2 device, 1.000 transaksi, drift 0) menunggu project dev.
 
@@ -263,8 +260,8 @@ test Functions lulus.
 >    sebagai resolution di rules; pembuatan transaksi adjustment otomatis
 >    menyusul bersama alur cycle-count VS-5. Untuk VS-3, Supervisor memilih
 >    "Terima angka server" atau "Abaikan (eskalasi)".
-> 2. WorkManager masih belum dipakai (lanjutan VS2-03): pengiriman otomatis
->    hanya saat app di depan.
+> 2. WorkManager kini dipakai, tetapi perilaku pada device OEM agresif belum
+>    dibuktikan; sync manual dan flush saat app dibuka tetap tersedia.
 > 3. Semua bukti di atas berasal dari CI/unit/widget test; angka NFR dan
 >    pemulihan "sync gagal 3 hari" belum diukur di device.
 
@@ -313,7 +310,7 @@ test Functions lulus.
 >    function. Retry 5/15/45 menit seperti di PRD perlu queue terpisah.
 > 3. Export PDF/CSV (Should) sengaja dipotong; Sheets tetap menjadi satu-satunya
 >    jalur ekspor pada pilot.
-> 4. WorkManager (VS2-03) dan pembuktian angka NFR masih terbuka.
+> 4. Pembuktian angka NFR masih terbuka; WorkManager sudah dipakai sejak VS2-03.
 
 ---
 
@@ -353,9 +350,9 @@ test Functions lulus.
 | M1/M7 | Belum diukur; butuh 3 sesi nyata di gudang uji | — | — |
 
 > **Keterbatasan VS-5:**
-> 1. Sesi hanya dikirim saat submit / tombol Kirim ulang / app dibuka. Tanpa
->    WorkManager, sesi yang dibuat offline baru sampai server setelah app
->    dibuka lagi (sama seperti VS2-03).
+> 1. Sesi dikirim saat submit / Kirim ulang / app dibuka dan oleh WorkManager
+>    tiap 15 menit saat jaringan tersedia; pada device OEM agresif penundaan
+>    masih mungkin terjadi.
 > 2. Auto-approve (semua variance nol) terjadi lokal; status akhir di server
 >    menyusul setelah sesi tersinkron.
 > 3. Approval mensyaratkan sesi sudah ada di Firestore; sesi yang masih lokal

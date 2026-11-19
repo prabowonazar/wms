@@ -25,9 +25,10 @@ runbook.
 > Functions lulus. Yang masih terbuka
 > hanya bukti di device: login Google nyata, kamera & debounce, simpan
 > transaksi ≤1,5 s, airplane mode → `synced`, override supervisor, konflik dua
-> device, SQLCipher, Crashlytics, angka NFR, serta job terjadwal dengan secret
-> Sheets. Outbox masih memakai timer foreground, bukan WorkManager - lihat
-> `docs/vertical-slice-backlog.md` (VS-2).
+> device, SQLCipher, Crashlytics, angka NFR, job terjadwal dengan secret
+> Sheets, dan eksekusi WorkManager pada device OEM agresif. Semua slice VS-0..VS-6
+> sudah punya kode dan bukti CI; lihat `docs/rollout-checklist.md` untuk bukti
+> device/ops yang masih harus diisi.
 
 ## Mulai cepat
 

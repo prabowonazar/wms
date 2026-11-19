@@ -73,8 +73,9 @@ panduan migrasi.
 
 ## 6. Utang yang masih terbuka
 
-- **VS2-03 WorkManager**: outbox dan cycle-count masih mengandalkan timer
-  foreground + flush saat app dibuka. Wajib sebelum rilis lapangan.
+- **WorkManager (VS2-03)**: sudah dipakai (task periodik 15 menit, constraint
+  jaringan) untuk outbox dan cycle-count. Masih perlu diuji pada device OEM
+  agresif; simpan bukti eksekusi task di logcat.
 - **VS5-06**: tab konflik di layar persetujuan cycle-count belum dibuat;
   daftar konflik tersedia di SCR-20.
 - **VS4-07**: ekspor PDF/CSV dipotong sesuai tiket Should.
