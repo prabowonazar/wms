@@ -16,12 +16,14 @@ class SearchScreen extends StatefulWidget {
     super.key,
     required this.database,
     required this.warehouseId,
+    required this.deps,
     this.initialQuery = '',
     this.debounce = const Duration(milliseconds: 250),
   });
 
   final Database database;
   final String warehouseId;
+  final ProductSheetDeps deps;
   final String initialQuery;
   final Duration debounce;
 
@@ -116,7 +118,7 @@ class _SearchScreenState extends State<SearchScreen> {
           : null;
     });
     if (view != null && view.product.active) {
-      await showProductSheet(context, view: view);
+      await showProductSheet(context, view: view, deps: widget.deps);
     }
   }
 
@@ -182,7 +184,8 @@ class _SearchScreenState extends State<SearchScreen> {
                     '${view.balance} ${view.uom}',
                     style: Theme.of(context).textTheme.titleSmall,
                   ),
-                  onTap: () => showProductSheet(context, view: view),
+                  onTap: () =>
+                      showProductSheet(context, view: view, deps: widget.deps),
                 );
               },
             ),

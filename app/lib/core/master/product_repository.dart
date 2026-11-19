@@ -100,6 +100,20 @@ class ProductRepository {
     return rows.map(ProductView.fromRow).toList(growable: false);
   }
 
+  /// Daftar produk + saldo untuk layar stok (SCR-12).
+  Future<List<ProductView>> listWithBalance({
+    int limit = 500,
+    bool onlyActive = true,
+  }) async {
+    final rows = await _database.rawQuery(
+      '$_selectProduct '
+      '${onlyActive ? 'WHERE p.active = 1 ' : ''}'
+      'ORDER BY p.name LIMIT ?',
+      [_warehouseId, limit],
+    );
+    return rows.map(ProductView.fromRow).toList(growable: false);
+  }
+
   Future<int> productCount() async {
     final rows = await _database.rawQuery(
       'SELECT COUNT(*) AS total FROM products',

@@ -197,6 +197,28 @@ graph LR
 
 **Exit (G2):** exactly-once terbukti di project dev dengan 2 device bersamaan; tidak ada drift saldo setelah 1.000 transaksi.
 
+**Status implementasi (19 Nov 2026):**
+
+| Area | Kode | CI | Device |
+|---|---|---|---|
+| Lembar transaksi | `MovementSheet` (SCR-04) + `ProductSheet` (SCR-13); qty default 1 sehingga scan → Keluar → Simpan = 3 tap | 2 widget test lulus | **belum** |
+| Submit idempoten | `Uuid7` + `TransactionRepository.recordMovement` (satu transaksi SQLite, PK `transaction_id`) | 14 unit test + 5 test UUID | **belum** (tap ganda & force-stop belum diuji nyata) |
+| Outbox | `OutboxSyncService`: flush saat app dibuka, setelah simpan, lalu tiap 60 detik selama app di depan. **Bukan WorkManager** | 6 unit test (termasuk 300 transaksi + replay) | **belum** |
+| Function `applyBalance` | `lib/apply-balance.js` + trigger `onDocumentCreated`; replay guard `lastTransactionId` | 10 unit test Functions | **belum** (butuh project dev; emulator belum menjalankan trigger) |
+| Stok negatif & override | SCR-08 + dialog SCR-09; hanya supervisor/admin; alasan wajib ≥10 karakter; `approval.pending` diputuskan server | 2 unit + 3 widget test + 2 test rules | **belum** |
+| Saldo & stock card lokal | `v_product_balance` + `v_stock_card` + layar stok (SCR-12) | 14 unit test + 2 test view skema | **belum** (NFR ≤1 s belum diukur) |
+
+> **Keterbatasan VS-2 yang disengaja:**
+> 1. Outbox memakai timer foreground, **bukan WorkManager**. Bila app dibunuh
+>    sebelum timer jalan, transaksi tetap aman di SQLite tetapi baru terkirim
+>    saat app dibuka lagi. Penggantian ke WorkManager adalah tiket VS2-03 dan
+>    wajib selesai sebelum rilis lapangan.
+> 2. Transaksi yang ditolak server (`serverStatus='rejected'`) belum ditarik
+>    kembali ke device, sehingga saldo lokal bisa lebih tinggi daripada server
+>    sampai rekonsiliasi di VS-3.
+> 3. Exactly-once baru dibuktikan lewat unit test dan fake remote; pembuktian
+>    end-to-end (2 device, 1.000 transaksi, drift 0) menunggu project dev.
+
 ---
 
 ### VS-3 — Kepercayaan: status sync, retry, konflik, histori

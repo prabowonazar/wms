@@ -8,7 +8,10 @@ import '../../core/master/master_sync.dart';
 import '../../core/master/product.dart';
 import '../../core/master/product_repository.dart';
 import '../../core/observability/telemetry.dart';
+import '../../core/transactions/outbox_sync.dart';
+import '../../core/transactions/transaction_repository.dart';
 import '../home/settings_sheet.dart';
+import '../stock/stock_list_screen.dart';
 import 'product_sheet.dart';
 import 'scanner_panel.dart';
 import 'search_screen.dart';
@@ -28,6 +31,8 @@ class ScanScreen extends StatefulWidget {
     required this.database,
     required this.products,
     required this.sync,
+    required this.transactions,
+    required this.outbox,
     required this.telemetry,
     required this.profile,
     required this.onSignOut,
@@ -37,6 +42,8 @@ class ScanScreen extends StatefulWidget {
   final Database database;
   final ProductRepository products;
   final MasterSyncService sync;
+  final TransactionRepository transactions;
+  final OutboxSyncService outbox;
   final Telemetry telemetry;
   final UserProfile profile;
   final Future<void> Function() onSignOut;
@@ -57,6 +64,13 @@ class _ScanScreenState extends State<ScanScreen> {
   String? _lastCode;
   DateTime? _lastCodeAt;
   bool _sheetOpen = false;
+
+  ProductSheetDeps get _deps => ProductSheetDeps(
+        transactions: widget.transactions,
+        outbox: widget.outbox,
+        profile: widget.profile,
+        telemetry: widget.telemetry,
+      );
 
   @override
   void initState() {
@@ -153,6 +167,7 @@ class _ScanScreenState extends State<ScanScreen> {
             userId: widget.profile.uid,
             code: code,
             reason: UnknownReason.unknown,
+            deps: _deps,
           ),
         ),
       );
@@ -171,6 +186,7 @@ class _ScanScreenState extends State<ScanScreen> {
             userId: widget.profile.uid,
             code: code,
             reason: UnknownReason.inactive,
+            deps: _deps,
           ),
         ),
       );
@@ -180,7 +196,7 @@ class _ScanScreenState extends State<ScanScreen> {
 
     unawaited(_recordScan(durationMs, 'found'));
     _sheetOpen = true;
-    await showProductSheet(context, view: view);
+    await showProductSheet(context, view: view, deps: _deps);
     _sheetOpen = false;
     _resetDebounce();
   }
@@ -204,6 +220,20 @@ class _ScanScreenState extends State<ScanScreen> {
           builder: (_) => SearchScreen(
             database: widget.database,
             warehouseId: widget.profile.warehouseId,
+            deps: _deps,
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _openStockList() {
+    unawaited(
+      Navigator.of(context).push(
+        MaterialPageRoute<void>(
+          builder: (_) => StockListScreen(
+            products: widget.products,
+            deps: _deps,
           ),
         ),
       ),
@@ -234,6 +264,11 @@ class _ScanScreenState extends State<ScanScreen> {
       appBar: AppBar(
         title: const Text('Scan'),
         actions: [
+          IconButton(
+            tooltip: 'Daftar stok',
+            onPressed: _openStockList,
+            icon: const Icon(Icons.inventory_2_outlined),
+          ),
           if (_syncing)
             const Padding(
               padding: EdgeInsets.only(right: 8),

@@ -166,7 +166,7 @@ menolak semua akses klien.
 | `note` | string | ❌ | |
 | `refTransactionId` | string | ❌ | Wajib untuk `reversal` (BR-06) |
 | `cycleCountId` | string | ❌ | Wajib untuk `adjustment` dari cycle-count |
-| `approval` | map | ❌ | `{ status: 'not_required'\|'pending'\|'approved'\|'rejected', approvedBy, approvedAt, reason }` |
+| `approval` | map | ❌ | `{ status: 'not_required'\|'pending'\|'approved'\|'rejected', approvedBy, approvedAt, reason }`. Client hanya boleh mengirim `status='pending'` + `reason` (≥10 karakter) saat override stok negatif; keputusan akhir ditulis Function |
 | `serverStatus` | string | ✅ | `applied` \| `awaiting_approval` \| `rejected` — ditulis Function |
 | `appVersion` | string | ✅ | Diagnostik |
 | `source` | string | ✅ | `scan` \| `manual` \| `cycle_count` \| `server` |
@@ -203,6 +203,11 @@ menolak semua akses klien.
 ### 2.7 `warehouses/{wid}/balances/{productId}`
 
 Cache saldo berjalan. **Hanya Function** yang menulis.
+
+> **VS-2:** yang sudah diisi baru `schemaVersion`, `warehouseId`, `productId`,
+> `endingQty`, `lastTransactionId`, dan `updatedAt`. Kolom akumulasi periode
+> (`openingQty`, `incomingQty`, dst.) baru ditulis job closing di VS-4; selama
+> VS-2 saldo mengikuti penjumlahan `signedQty` ledger.
 
 | Field | Tipe | Keterangan |
 |---|---|---|
@@ -393,26 +398,41 @@ sebelum rilis (jalankan `firebase deploy --only firestore:indexes`).
 ### 5.1 Client membuat transaksi
 
 ```
-App → batch.create(transactions/{uuid}, data)
-      ↳ Jika dokumen sudah ada → "already exists" → anggap sukses (idempoten)
+App → runTransaction:
+        baca transactions/{uuid}
+        jika sudah ada → "already exists" → anggap sukses (idempoten)
+        jika belum     → set(transactions/{uuid}, payload)
 ```
 
-Tidak ada update saldo dari client. Setelah create sukses, baris lokal ditandai `synced`.
+Tidak ada update saldo dari client. Setelah create sukses, baris lokal ditandai
+`synced`. Pola baca-lalu-tulis dipakai karena `set()` biasa akan menimpa dokumen
+dan merusak semantik create-only (BR-04).
 
 ### 5.2 Function menerapkan transaksi ke saldo
 
 Trigger `onDocumentCreated('transactions/{txnId}')`:
 
 ```
+if data.serverStatus sudah ada → return            // retry trigger, sudah diproses
 runTransaction:
   balanceRef = warehouses/{wid}/balances/{productId}
-  if balance.lastTransactionId == txnId: return   // replay guard
-  if txn.serverStatus != 'applied': return        // menunggu approval
-  hitung signedQty
-  validasi: ending = ... ; jika < 0 dan bukan override → set serverStatus='rejected'
-  tulis balance + auditLog
-  tulis stockCards periode berjalan (atau biarkan closing job)
+  actorRole  = users/{userId}.role
+  putuskan (lib/apply-balance.js):
+    - signedQty harus sama dengan expectedSignedQty(type, qty)
+    - replay: balance.lastTransactionId == txnId → skip
+    - ending = endingQty + signedQty
+    - ending < 0:
+        override sah? (approval.status='pending' DAN reason ≥10 DAN
+                       actorRole supervisor/admin)
+          ya   → apply, approval.status='approved'
+          tidak → reject (negative_stock / override_not_allowed)
+  reject → tulis serverStatus='rejected' + rejectedReason + auditLog
+  apply  → tulis balances (endingQty, lastTransactionId, updatedAt),
+           serverStatus='applied' + createdAtServer, lalu auditLog
 ```
+
+Selama VS-2 Function **tidak** menulis `stockCards`; agregasi periode dan
+closing harian masuk VS-4.
 
 **Batas penting:** Firestore membatasi **1 write/detik per dokumen**. Untuk SKU "panas" yang di-scan beberapa device bersamaan, Function bisa gagal karena contention. Mitigasi:
 - retry otomatis (idempotent karena `lastTransactionId`),

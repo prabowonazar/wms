@@ -1,10 +1,12 @@
 'use strict';
 
 const { onCall, HttpsError } = require('firebase-functions/v2/https');
+const { onDocumentCreated } = require('firebase-functions/v2/firestore');
 const { initializeApp } = require('firebase-admin/app');
 const { getFirestore, FieldValue } = require('firebase-admin/firestore');
 
 const { buildHealthPayload } = require('./lib/health');
+const { decideApply } = require('./lib/apply-balance');
 const {
   validateImportRows,
   buildImportId,
@@ -151,6 +153,125 @@ exports.importProducts = onCall(
     } finally {
       await releaseImportLock(warehouseId, importId);
     }
+  },
+);
+
+/**
+ * VS2-04: terapkan transaksi ke saldo gudang (BR-01/03/04).
+ *
+ * Trigger create, bukan callable: client tidak pernah menulis saldo, dan
+ * pengiriman ulang dokumen yang sama tidak memicu efek kedua karena rules
+ * create-only + replay guard `lastTransactionId`.
+ */
+exports.applyBalance = onDocumentCreated(
+  { document: 'transactions/{transactionId}', region: REGION },
+  async (event) => {
+    const snapshot = event.data;
+    if (!snapshot) {
+      return;
+    }
+    const data = snapshot.data();
+    if (!data || data.serverStatus) {
+      // Sudah diproses (mis. retry trigger setelah commit sukses).
+      return;
+    }
+
+    const warehouseId = data.warehouseId;
+    const productId = data.productId;
+    if (typeof warehouseId !== 'string' || typeof productId !== 'string') {
+      return;
+    }
+
+    const userSnapshot = await db.doc(`users/${data.userId}`).get();
+    const actorRole = userSnapshot.exists
+      ? userSnapshot.get('role')
+      : null;
+
+    const balanceRef = db.doc(
+      `warehouses/${warehouseId}/balances/${productId}`,
+    );
+    const auditRef = db.collection('auditLogs').doc();
+
+    await db.runTransaction(async (txn) => {
+      const balanceSnapshot = await txn.get(balanceRef);
+      const balance = balanceSnapshot.exists ? balanceSnapshot.data() : null;
+
+      const decision = decideApply({
+        transaction: data,
+        balance,
+        actorRole,
+        transactionId: snapshot.id,
+      });
+      if (decision.action === 'skip') {
+        return;
+      }
+
+      const now = FieldValue.serverTimestamp();
+
+      if (decision.action === 'reject') {
+        txn.set(
+          snapshot.ref,
+          {
+            serverStatus: 'rejected',
+            rejectedReason: decision.reason,
+            processedAt: now,
+          },
+          { merge: true },
+        );
+        txn.set(auditRef, {
+          action: 'transaction.rejected',
+          actorUid: 'system',
+          entity: 'transactions',
+          entityId: snapshot.id,
+          reason: decision.reason,
+          before: { endingQty: balance ? balance.endingQty ?? 0 : 0 },
+          after: { serverStatus: 'rejected' },
+          at: now,
+        });
+        return;
+      }
+
+      txn.set(
+        balanceRef,
+        {
+          schemaVersion: 1,
+          warehouseId,
+          productId,
+          endingQty: decision.endingQty,
+          lastTransactionId: snapshot.id,
+          updatedAt: now,
+        },
+        { merge: true },
+      );
+
+      const updates = {
+        serverStatus: 'applied',
+        createdAtServer: now,
+        processedAt: now,
+      };
+      if (decision.override) {
+        updates.approval = {
+          status: 'approved',
+          approvedBy: data.userId,
+          approvedAt: now,
+          reason: decision.reason,
+        };
+      }
+      txn.update(snapshot.ref, updates);
+
+      txn.set(auditRef, {
+        action: 'transaction.applied',
+        actorUid: data.userId,
+        entity: 'transactions',
+        entityId: snapshot.id,
+        reason: decision.override
+          ? `Override stok negatif: ${decision.reason}`
+          : 'Transaksi diterapkan ke saldo',
+        before: { endingQty: balance ? balance.endingQty ?? 0 : 0 },
+        after: { endingQty: decision.endingQty },
+        at: now,
+      });
+    });
   },
 );
 

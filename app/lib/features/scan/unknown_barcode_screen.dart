@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:sqflite_common/sqlite_api.dart';
 
 import '../../core/observability/telemetry.dart';
+import 'product_sheet.dart';
 import 'search_screen.dart';
 
 enum UnknownReason {
@@ -24,6 +25,7 @@ class UnknownBarcodeScreen extends StatefulWidget {
     required this.userId,
     required this.code,
     required this.reason,
+    required this.deps,
   });
 
   final Database database;
@@ -32,6 +34,7 @@ class UnknownBarcodeScreen extends StatefulWidget {
   final String userId;
   final String code;
   final UnknownReason reason;
+  final ProductSheetDeps deps;
 
   @override
   State<UnknownBarcodeScreen> createState() => _UnknownBarcodeScreenState();
@@ -109,6 +112,7 @@ class _UnknownBarcodeScreenState extends State<UnknownBarcodeScreen> {
         builder: (_) => SearchScreen(
           database: widget.database,
           warehouseId: widget.warehouseId,
+          deps: widget.deps,
           initialQuery: widget.code,
         ),
       ),

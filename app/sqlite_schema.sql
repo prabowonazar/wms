@@ -125,6 +125,9 @@ CREATE TABLE IF NOT EXISTS transactions (
     cycle_count_id     TEXT,
     approval_status    TEXT NOT NULL DEFAULT 'not_required'
                        CHECK (approval_status IN ('not_required','pending','approved','rejected')),
+    -- Alasan override stok negatif (BR-03). Wajib bila approval_status =
+    -- 'pending'/'approved'; ikut dikirim sebagai approval.reason di Firestore.
+    approval_reason    TEXT,
     source             TEXT NOT NULL DEFAULT 'scan'
                        CHECK (source IN ('scan','manual','cycle_count','server')),
 

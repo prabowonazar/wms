@@ -387,6 +387,36 @@ describe('transaksi ledger', () => {
       ),
     );
   });
+
+  it('override stok negatif boleh dikirim sebagai approval pending', async () => {
+    await assertSucceeds(
+      setDoc(
+        doc(authedDb('sv1'), 'transactions/tx-11'),
+        validTransaction({
+          userId: 'sv1',
+          approval: {
+            status: 'pending',
+            reason: 'barang keluar belum tercatat',
+          },
+        }),
+      ),
+    );
+  });
+
+  it('client tidak boleh mengirim approval yang sudah approved', async () => {
+    await assertFails(
+      setDoc(
+        doc(authedDb('sv1'), 'transactions/tx-12'),
+        validTransaction({
+          userId: 'sv1',
+          approval: {
+            status: 'approved',
+            reason: 'barang keluar belum tercatat',
+          },
+        }),
+      ),
+    );
+  });
 });
 
 describe('cycle count', () => {

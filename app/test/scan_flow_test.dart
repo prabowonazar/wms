@@ -7,9 +7,13 @@ import 'package:warehouse_mobile/core/master/master_sync.dart';
 import 'package:warehouse_mobile/core/master/product.dart';
 import 'package:warehouse_mobile/core/master/product_repository.dart';
 import 'package:warehouse_mobile/core/observability/telemetry.dart';
+import 'package:warehouse_mobile/core/transactions/outbox_sync.dart';
+import 'package:warehouse_mobile/core/transactions/transaction_repository.dart';
+import 'package:warehouse_mobile/features/scan/product_sheet.dart';
 import 'package:warehouse_mobile/features/scan/scan_screen.dart';
 import 'package:warehouse_mobile/features/scan/search_screen.dart';
 
+import 'support/fake_transaction_remote.dart';
 import 'support/test_database.dart';
 
 class EmptyRemote implements MasterRemote {
@@ -82,14 +86,34 @@ Future<void> markMasterFresh(Database database) async {
 
 void main() {
   late Database database;
+  late TransactionRepository transactions;
+  late OutboxSyncService outbox;
 
   setUp(() async {
     database = await openTestDatabase();
+    transactions = TransactionRepository(
+      database: database,
+      warehouseId: 'JKT-01',
+    );
+    outbox = OutboxSyncService(
+      repository: transactions,
+      remote: FakeTransactionRemote(),
+      telemetry: const NoopTelemetry(),
+    );
   });
 
   tearDown(() async {
     await database.close();
   });
+
+  ProductSheetDeps buildDeps() {
+    return ProductSheetDeps(
+      transactions: transactions,
+      outbox: outbox,
+      profile: profile,
+      telemetry: const NoopTelemetry(),
+    );
+  }
 
   Widget buildScanScreen() {
     return MaterialApp(
@@ -104,6 +128,8 @@ void main() {
           remote: EmptyRemote(),
           warehouseId: 'JKT-01',
         ),
+        transactions: transactions,
+        outbox: outbox,
         telemetry: const NoopTelemetry(),
         profile: profile,
         onSignOut: () async {},
@@ -151,6 +177,8 @@ void main() {
             remote: EmptyRemote(),
             warehouseId: 'JKT-01',
           ),
+          transactions: transactions,
+          outbox: outbox,
           telemetry: const NoopTelemetry(),
           profile: profile,
           onSignOut: () async {},
@@ -195,6 +223,8 @@ void main() {
             remote: EmptyRemote(),
             warehouseId: 'JKT-01',
           ),
+          transactions: transactions,
+          outbox: outbox,
           telemetry: const NoopTelemetry(),
           profile: profile,
           onSignOut: () async {},
@@ -264,7 +294,11 @@ void main() {
     await seedProduct(database);
     await tester.pumpWidget(
       MaterialApp(
-        home: SearchScreen(database: database, warehouseId: 'JKT-01'),
+        home: SearchScreen(
+          database: database,
+          warehouseId: 'JKT-01',
+          deps: buildDeps(),
+        ),
       ),
     );
 
@@ -284,7 +318,11 @@ void main() {
     await seedProduct(database);
     await tester.pumpWidget(
       MaterialApp(
-        home: SearchScreen(database: database, warehouseId: 'JKT-01'),
+        home: SearchScreen(
+          database: database,
+          warehouseId: 'JKT-01',
+          deps: buildDeps(),
+        ),
       ),
     );
 

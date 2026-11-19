@@ -18,6 +18,11 @@ class TelemetryEvents {
   /// VS1-07: durasi `scan_start -> product_shown` beserta hasilnya.
   static const String scanCompleted = 'scan_completed';
   static const String unknownBarcodeReported = 'unknown_barcode_reported';
+
+  /// VS2-02/VS2-03: transaksi tersimpan lokal dan hasil kiriman outbox.
+  static const String transactionSaved = 'transaction_saved';
+  static const String outboxSyncCompleted = 'outbox_sync_completed';
+  static const String outboxSyncFailed = 'outbox_sync_failed';
 }
 
 /// Titik masuk tunggal untuk analytics & crash reporting.

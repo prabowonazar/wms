@@ -13,6 +13,7 @@ import '../core/master/master_remote.dart';
 import '../core/observability/telemetry.dart';
 import '../core/security/db_key_store.dart';
 import '../core/storage/profile_cache.dart';
+import '../core/transactions/transaction_remote.dart';
 import 'app_services.dart';
 
 /// Urutan bootstrap yang disengaja:
@@ -75,6 +76,7 @@ Future<AppServices> bootstrap({Telemetry telemetry = const FirebaseTelemetry()})
     auth: auth,
     telemetry: telemetry,
     masterRemote: FirestoreMasterRemote(FirebaseFirestore.instance),
+    transactionRemote: FirestoreTransactionRemote(FirebaseFirestore.instance),
   );
 }
 

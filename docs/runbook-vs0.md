@@ -31,10 +31,12 @@
 | Kunci DB | `app/lib/core/security/db_key_store.dart` | 32 byte acak -> base64Url -> `flutter_secure_storage` |
 | Layar | `app/lib/features/**` | Login, akun ditolak, beranda per role, pengaturan, config hilang, bootstrap gagal |
 | Test | `app/test/**` | SQL splitter, skema via FFI, profil, role policy, widget config |
-| Functions | `firebase/functions/**` | `health` + `importProducts` callable, validasi murni di `lib/` |
-| Rules test | `firebase/test/**` | 35 kasus izin/tolak di emulator |
+| Functions | `firebase/functions/**` | `health` + `importProducts` callable, trigger `applyBalance`, validasi murni di `lib/` |
+| Rules test | `firebase/test/**` | 37 kasus izin/tolak di emulator |
 | Master (VS-1) | `app/lib/core/master/**` | Model produk, sync full/delta, lookup & pencarian lokal |
 | Scan (VS-1) | `app/lib/features/scan/**`, `features/home/settings_sheet.dart` | SCR-03/06/07, debounce 800 ms, banner master, pengaturan |
+| Ledger (VS-2) | `app/lib/core/transactions/**` | UUIDv7, repository SQLite atomik, remote create-only, outbox |
+| Transaksi (VS-2) | `app/lib/features/movement/**`, `features/stock/**` | SCR-04/08/09/12/13: masuk/keluar, override, saldo & stock card |
 | CI | `.github/workflows/ci.yml` | analyze/test/APK, Functions, rules emulator |
 | Verifikasi | `tools/verify-vs0.ps1` | Pemeriksaan statis + opsi `-RunTests` |
 | Verifikasi skema | `tools/verify-schema-sqlite.ps1` | Menjalankan `sqlite_schema.sql` di SQLite 3.43.2 nyata (Windows, tanpa toolchain) |
@@ -304,6 +306,10 @@ Yang harus hijau:
 | `test/role_policy_test.dart` | Permission & menu berbeda per role |
 | `test/user_profile_test.dart` | Parsing profil & alasan penolakan |
 | `test/config_missing_screen_test.dart` | Widget layar config |
+| `test/uuid7_test.dart` | Format/versi/varian UUIDv7, urutan waktu, injeksi clock |
+| `test/transaction_repository_test.dart` | Ledger lokal: tanda, saldo, override, idempoten, immutability, stock card, outbox |
+| `test/outbox_sync_test.dart` | Flush 300 transaksi, replay, jaringan mati, lanjut setelah pulih |
+| `test/movement_flow_test.dart` | Widget SCR-04/08/09: keluar, stok tidak cukup, override supervisor, qty 0 |
 
 Catatan Windows: `sqflite_common_ffi` membutuhkan `sqlite3.dll` yang kompatibel.
 Bila test FFI gagal dengan pesan "sqlite3.dll not found", jalankan di CI (Ubuntu)
@@ -337,12 +343,13 @@ Set-Location ..
 firebase emulators:exec --only firestore --project demo-warehouse "node --test test/"
 ```
 
-Harapan: 35 kasus lulus, emulator berhenti sendiri. Kasus mencakup:
+Harapan: 37 kasus lulus, emulator berhenti sendiri. Kasus mencakup:
 
 - default deny untuk pengguna tanpa login;
 - operator nonaktif tidak bisa membaca data, tetapi tetap bisa membaca profilnya;
 - operator tidak bisa membaca transaksi operator lain; supervisor bisa;
 - `transactions` create-only: update/delete ditolak, metadata server ditolak, qty 0 ditolak;
+- override stok negatif hanya boleh dikirim sebagai `approval.status='pending'`;
 - `balances`, `auditLogs` hanya boleh ditulis Function;
 - cycle-count: hanya status `open` yang bisa dibuat, approve tidak bisa dari client,
   `variance` harus cocok, kolom hasil approval tidak boleh diisi client;
@@ -358,7 +365,8 @@ node --test test/
 ```
 
 CI tidak menjalankan `npm install` untuk Functions karena hanya menguji logika murni;
-deploy tetap membutuhkan dependency.
+deploy tetap membutuhkan dependency. `test/apply-balance.test.js` menguji keputusan
+saldo/override/replay tanpa emulator (10 kasus).
 
 ---
 
@@ -437,7 +445,7 @@ Jangan commit: `dart_defines/`, `google-services.json`, service account, `*.jks`
 
 ---
 
-## 10. Status verifikasi (jujur, VS-0 + VS-1)
+## 10. Status verifikasi (jujur, VS-0 + VS-1 + VS-2)
 
 | Hal | Status |
 |---|---|
@@ -450,17 +458,23 @@ Jangan commit: `dart_defines/`, `google-services.json`, service account, `*.jks`
 | Tidak ada kredensial ter-commit | Ya |
 | Skrip ASCII | Ya |
 | `flutter pub get` | **Lolos di CI** (Flutter 3.32.5; `sqflite_sqlcipher` dipin 3.3.0) |
-| `flutter analyze` | **Bersih di CI** - `No issues found!` |
-| `flutter test` | **60 test lolos di CI** (termasuk 8 test sync master, 8 lookup/pencarian, 8 widget scan, FFI Schema) |
+| `flutter analyze` | **Bersih di CI** (run terakhir VS-1) |
+| `flutter test` | **90 test** (VS-1: 60; VS-2 menambah 5 UUID, 14 repository, 6 outbox, 5 widget movement) |
 | Build APK Android | **Lolos di CI** sebagai smoke build (Android di-scaffold, minSdk 26, compileSdk 36, NDK 27); bukan bukti konfigurasi final |
-| Rules test emulator | **35 kasus lolos di CI** (target minimal 12) |
-| Functions unit test | **12 test lolos di CI** (3 `health`, 9 validasi impor) |
+| Rules test emulator | **37 kasus** (VS-2 menambah 2 kasus approval) |
+| Functions unit test | **22 test** (12 VS-1 + 10 `apply-balance`) |
 | Versi paket terkunci (`pubspec.lock`) | Diambil dari artifact CI lalu di-commit (77 paket) |
 | Login Google nyata di device | **Belum dijalankan** (butuh project dev + SHA-1) |
 | SQLCipher di device | **Belum dibuktikan** (baru desain + test non-enkripsi via FFI) |
 | Crashlytics & Analytics | **Belum dibuktikan** |
 | Scan kamera, debounce, banner offline (VS-1) | **Belum dibuktikan di device**; baru widget test dengan scanner palsu |
 | Angka NFR VS-1 (lookup p95 ≤50 ms, scan→tampil ≤300 ms, 2.000 SKU ≤60 s) | **Belum diukur** |
+| Core loop VS-2 (simpan ≤1,5 s, offline → synced, saldo turun) | **Belum dibuktikan di device**; baru unit/widget test dengan remote palsu |
+| Exactly-once VS-2 (300 transaksi, replay, drift 0) | **Belum dibuktikan end-to-end**; unit test remote palsu lulus, trigger Firestore belum dijalankan di emulator |
+
+> Angka 90/37/22 berasal dari kode di commit VS-2 dan baru menjadi bukti setelah
+> CI run VS-2 hijau (§9). Bila CI menampilkan angka berbeda, perbaiki tabel ini
+> pada commit yang sama dengan perbaikannya.
 
 Bukti CI terakhir: run #12 (`d08e373`) keempat job hijau. Detail per job:
 
@@ -500,6 +514,8 @@ Riwayat CI (semua kegagalan sudah diperbaiki dan dibuktikan ulang):
 | Login Google di emulator | Tidak bisa diuji end-to-end | Demo login di project dev; emulator untuk rules/Firestore |
 | Analytics debug tidak muncul | Bukti VS0-06 kurang | `setprop debug.firebase.analytics.app` + tunggu beberapa menit |
 | Data lama tidak bisa dibuka bila kunci hilang | Outbox hilang | Jangan hapus app; jangan rotasi kunci; dokumentasikan ke operator |
+| Outbox hanya timer foreground (bukan WorkManager) | Transaksi tertunda lebih lama bila app dibunuh OS | Flush saat app dibuka + setelah simpan sudah ada; ganti WorkManager (VS2-03) sebelum rilis lapangan |
+| Transaksi ditolak server belum ditarik ke device | Saldo lokal > server sampai rekonsiliasi VS-3 | Catat sebagai keterbatasan VS-2; jangan klaim drift 0 sebelum VS-3 |
 
 ---
 
@@ -589,4 +605,74 @@ Setelah impor, login sebagai operator gudang yang sama dan tekan
 
 Catatan: pengukuran NFR **belum** dilakukan di mesin ini (tanpa device dan
 project dev). Angka di atas harus diisi dari demo nyata.
+
+---
+
+## 15. Demo VS-2 (transaksi offline → sync → saldo)
+
+Prasyarat: VS-1 §14 sudah jalan (master produk ada di device), Functions
+`applyBalance` dan rules terbaru sudah di-deploy ke project dev:
+
+```powershell
+cd firebase
+firebase deploy --only firestore:rules,functions
+```
+
+### 15.1 Skenario inti (bukti AC VS2-01/02/03/06)
+
+1. Aktifkan **airplane mode**.
+2. Scan produk yang stoknya sudah ada (mis. hasil transaksi masuk sebelumnya).
+3. Ketuk **Keluar** → biarkan qty `1` → ketuk **SIMPAN**.
+   Catat waktu dari tap SIMPAN sampai snackbar muncul (target ≤1,5 s).
+4. Ulangi 3× untuk produk yang sama; saldo di lembar produk harus turun
+   sebesar 3 dan bertanda "Termasuk N yang belum terkirim ke server."
+5. Matikan airplane mode. Tunggu maksimal 60 detik (timer outbox) atau
+   tutup-buka app (flush saat app dibuka).
+6. Periksa Firestore:
+   - `transactions/{uuid}` bertambah tepat 3 dokumen, `serverStatus='applied'`;
+   - `warehouses/{wh}/balances/{productId}.endingQty` turun 3;
+   - `auditLogs` memuat 3 entri `transaction.applied`.
+7. Saldo di device tetap sama dan keterangan "belum terkirim" hilang.
+
+### 15.2 Idempotensi (bukti AC VS2-02/04)
+
+1. Tap **SIMPAN** dua kali cepat pada qty yang sama → hanya satu baris di
+   `transactions` lokal dan satu dokumen di Firestore.
+2. Replay manual: dengan DB debug, ubah `sync_status` satu baris menjadi
+   `pending` lalu buka app. Outbox mengirim ulang, tetapi jumlah dokumen
+   Firestore **tidak** bertambah dan `endingQty` tidak berubah.
+
+### 15.3 Stok negatif & override (bukti AC VS2-05)
+
+1. Login sebagai **operator**, coba keluar melebihi saldo → SCR-08 muncul,
+   tidak ada tombol Override, ledger tidak bertambah.
+2. Login sebagai **supervisor**, ulangi → isi alasan ≥10 karakter → ketuk
+   **Override**. Saldo lokal boleh negatif, `approval.status='pending'`.
+3. Setelah sync, periksa `transactions/{uuid}`: `approval.status='approved'`,
+   `approvedBy` terisi, dan `auditLogs` memuat alasan override.
+4. Ulangi dengan user supervisor yang `users/{uid}.role` diubah menjadi
+   `operator` sebelum sync → server menolak (`serverStatus='rejected'`).
+   Ini juga menunjukkan keterbatasan VS-2: device belum menarik status tolak
+   tersebut (baru di VS-3).
+
+### 15.4 Beban 300 transaksi (target G2)
+
+1. Dengan airplane mode, buat 300 transaksi (bisa lewat skrip debug/loop
+   repository, bukan UI).
+2. Aktifkan jaringan dan biarkan outbox bekerja.
+3. Periksa jumlah dokumen `transactions` = 300 (tidak lebih) dan
+   `endingQty` = Σ `signedQty` seluruh dokumen.
+4. Catat durasi sampai antrean kosong; ini angka sementara untuk G2 dan
+   harus diulang dengan 2 device di VS-3/VS-6.
+
+### 15.5 Bukti yang perlu dicatat
+
+| Bukti | Cara |
+|---|---|
+| `transaction_saved` | DebugView: `type`, `qty`, `override` |
+| `outbox_sync_completed` | DebugView: `sent`, `failed`, `remaining` |
+| `outbox_sync_failed` | DebugView + Crashlytics non-fatal `outbox_sync_failed` |
+| Waktu simpan ≤1,5 s | stopwatch manual 10×, ambil p95 |
+| Exactly-once | jumlah dokumen Firestore vs baris SQLite |
+
 

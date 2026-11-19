@@ -6,19 +6,24 @@ sekali. Proyek ini dibangun bertahap lewat 7 vertical slice (VS-0..VS-6).
 
 ## Status
 
-**VS-0 (fondasi) dan VS-1 (scan & master data offline) - kode selesai dan CI
-hijau; belum diverifikasi di device.**
+**VS-0 (fondasi), VS-1 (scan & master data offline), dan VS-2 (core loop
+transaksi offline → sync → saldo) - kode selesai dan lolos test lokal/CI;
+belum diverifikasi di device.**
 
 Yang sudah ada: login Google + role gate, database SQLCipher, skema v1, rules
-Firestore + 35 test rules, Cloud Functions `health` dan `importProducts` + 12
-test, sync master full/delta, layar scan + pencarian lokal, CI, dan runbook.
+Firestore + 37 test rules, Cloud Functions `health`, `importProducts`, dan
+trigger `applyBalance` + 22 test, sync master full/delta, layar scan +
+pencarian lokal, ledger lokal + outbox idempoten, lembar masuk/keluar, saldo
+& stock card, CI, dan runbook.
 
 > Mesin ini tidak punya Flutter/Dart/Node/Java, jadi seluruh bukti kompilasi
-> datang dari CI GitHub Actions (run #12, commit `d08e373`): `flutter analyze`
-> bersih, 60 test Flutter lulus, APK debug terbangun, 35 test rules dan 12 test
-> Functions lulus. Yang masih terbuka hanya bukti di device: login Google nyata,
-> kamera & debounce di perangkat, SQLCipher terenkripsi, Crashlytics, Analytics,
-> serta angka NFR (lookup p95, scan→tampil, sync 2.000 SKU).
+> datang dari CI GitHub Actions: `flutter analyze` bersih, 90 test Flutter,
+> APK debug terbangun, 37 test rules, dan 22 test Functions. Yang masih terbuka
+> hanya bukti di device: login Google nyata, kamera & debounce, simpan
+> transaksi ≤1,5 s, airplane mode → `synced`, override supervisor, SQLCipher,
+> Crashlytics, serta angka NFR (lookup p95, scan→tampil, sync 2.000 SKU).
+> Outbox VS-2 masih memakai timer foreground, bukan WorkManager - lihat
+> keterbatasan di `docs/vertical-slice-backlog.md` (VS-2).
 
 ## Mulai cepat
 
@@ -48,7 +53,8 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\verify-vs0.ps1 -RunT
 app/                 Flutter app (lib, test, sqlite_schema.sql, pubspec)
   lib/core/          config, sql, db, security, auth, storage, observability
   lib/core/master/   model produk, sync full/delta, lookup & pencarian lokal
-  lib/features/      login, denied, home, splash, bootstrap, scan
+  lib/core/transactions/  ledger lokal, UUIDv7, remote create-only, outbox
+  lib/features/      login, denied, home, splash, bootstrap, scan, movement, stock
   test/              test unit, FFI SQLite, widget
 firebase/            rules, indexes, firebase.json, functions/, test/
 docs/                PRD, skema, UX, spike, backlog slice, runbook
