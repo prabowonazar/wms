@@ -35,6 +35,10 @@ class AppConfig {
   /// `true` bila app harus menunjuk ke Firebase Emulator Suite (VS0-02).
   static const bool useEmulator = bool.fromEnvironment('USE_EMULATOR');
 
+  /// Mode demo: lewati login & Firebase network, pakai data contoh lokal.
+  /// Hanya untuk build `--dart-define=DEMO_MODE=true`, jangan dipakai rilis.
+  static const bool demoMode = bool.fromEnvironment('DEMO_MODE');
+
   /// Host emulator dari sudut pandang device.
   /// `10.0.2.2` = loopback host dari Android Emulator; device fisik memakai IP LAN.
   static const String emulatorHost =

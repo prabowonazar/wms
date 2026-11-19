@@ -16,12 +16,14 @@ class HomeScreen extends StatelessWidget {
     required this.profile,
     this.scannerBuilder,
     this.outboxInterval = const Duration(seconds: 60),
+    this.demoMode = false,
   });
 
   final AppServices services;
   final UserProfile profile;
   final ScannerBuilder? scannerBuilder;
   final Duration outboxInterval;
+  final bool demoMode;
 
   @override
   Widget build(BuildContext context) {
@@ -30,6 +32,7 @@ class HomeScreen extends StatelessWidget {
       profile: profile,
       scannerBuilder: scannerBuilder,
       outboxInterval: outboxInterval,
+      demoMode: demoMode,
     );
   }
 }

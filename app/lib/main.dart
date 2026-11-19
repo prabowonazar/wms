@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'app.dart';
 import 'bootstrap/bootstrap.dart';
 import 'core/config/app_config.dart';
+import 'core/demo/demo_data.dart';
 import 'core/observability/telemetry.dart';
 
 Future<void> main() async {
@@ -44,6 +45,13 @@ Future<void> main() async {
 
   try {
     final services = await bootstrap(telemetry: telemetry);
+    if (AppConfig.demoMode) {
+      await seedDemoData(services.database);
+      runApp(
+        WarehouseApp(services: services, demoProfile: demoProfile),
+      );
+      return;
+    }
     runApp(WarehouseApp(services: services));
   } catch (error, stackTrace) {
     await telemetry.recordError(

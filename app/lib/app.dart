@@ -19,9 +19,16 @@ ThemeData buildAppTheme() {
 }
 
 class WarehouseApp extends StatelessWidget {
-  const WarehouseApp({super.key, required this.services});
+  const WarehouseApp({
+    super.key,
+    required this.services,
+    this.demoProfile,
+  });
 
   final AppServices services;
+
+  /// Bukan null hanya pada build DEMO_MODE.
+  final UserProfile? demoProfile;
 
   @override
   Widget build(BuildContext context) {
@@ -29,7 +36,10 @@ class WarehouseApp extends StatelessWidget {
       title: 'Gudang',
       debugShowCheckedModeBanner: false,
       theme: buildAppTheme(),
-      home: _AuthGate(services: services),
+      home: _AuthGate(
+        services: services,
+        demoProfile: demoProfile,
+      ),
     );
   }
 }
@@ -67,9 +77,10 @@ class BootstrapFailureApp extends StatelessWidget {
 }
 
 class _AuthGate extends StatefulWidget {
-  const _AuthGate({required this.services});
+  const _AuthGate({required this.services, this.demoProfile});
 
   final AppServices services;
+  final UserProfile? demoProfile;
 
   @override
   State<_AuthGate> createState() => _AuthGateState();
@@ -80,6 +91,15 @@ class _AuthGateState extends State<_AuthGate> {
 
   @override
   Widget build(BuildContext context) {
+    final demo = widget.demoProfile;
+    if (demo != null) {
+      return HomeScreen(
+        services: widget.services,
+        profile: demo,
+        demoMode: true,
+      );
+    }
+
     return StreamBuilder<AuthState>(
       stream: _states,
       initialData: widget.services.auth.currentState,

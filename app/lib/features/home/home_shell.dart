@@ -34,6 +34,7 @@ class HomeShell extends StatefulWidget {
     required this.profile,
     this.scannerBuilder,
     this.outboxInterval = const Duration(seconds: 60),
+    this.demoMode = false,
   });
 
   final AppServices services;
@@ -43,6 +44,9 @@ class HomeShell extends StatefulWidget {
   /// Kompatibilitas API; interval kini diatur WorkManager (15 menit) di
   /// `BackgroundSync`, bukan timer foreground.
   final Duration outboxInterval;
+
+  /// Mode demo: jangan memanggil WorkManager/Firestore sama sekali.
+  final bool demoMode;
 
   @override
   State<HomeShell> createState() => _HomeShellState();
@@ -92,9 +96,11 @@ class _HomeShellState extends State<HomeShell> {
   @override
   void initState() {
     super.initState();
-    unawaited(BackgroundSync.initialize());
-    unawaited(_outbox.flush());
-    unawaited(_cycleCountSync.flushPending());
+    if (!widget.demoMode) {
+      unawaited(BackgroundSync.initialize());
+      unawaited(_outbox.flush());
+      unawaited(_cycleCountSync.flushPending());
+    }
     unawaited(_loadSummary());
     _subscription = _outbox.results.listen((_) => unawaited(_loadSummary()));
     _timer = Timer.periodic(

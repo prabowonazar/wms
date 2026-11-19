@@ -309,6 +309,19 @@ workflow dan pasang artifact `app-debug-apk` terbaru.
 
 Jangan pernah commit nilai-nilai di atas maupun `google-services.json`.
 
+### 5.3 APK demo tanpa login
+
+Untuk memeriksa UI di device sebelum Firebase dev siap, unduh artifact
+**`app-demo-apk`** dari workflow CI. APK ini dibangun dengan
+`--dart-define=DEMO_MODE=true`, sehingga:
+
+- melewati layar login dan memakai profil admin lokal;
+- mengisi 3 produk + beberapa transaksi contoh ke SQLite;
+- menandai master sebagai segar dan **tidak** memanggil WorkManager/Firestore.
+
+Mode ini hanya untuk inspeksi UI. Jangan dipakai untuk menguji sync, approval,
+atau flow login; gunakan APK dari `FB_*` secrets seperti §5.2.
+
 ---
 
 ## 6. Emulator lokal (VS0-02)
