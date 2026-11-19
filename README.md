@@ -20,7 +20,7 @@ saldo, histori berfilter, reversal + audit, dashboard, cycle count, CI, dan
 runbook.
 
 > Mesin ini tidak punya Flutter/Dart/Node/Java, jadi seluruh bukti kompilasi
-> datang dari CI GitHub Actions (run #39, commit `4695d0b`): `flutter analyze`
+> datang dari CI GitHub Actions (run #45, commit `4cb460c`): `flutter analyze`
 > bersih, 112 test Flutter, APK debug terbangun, 46 test rules, dan 51 test
 > Functions lulus. Yang masih terbuka
 > hanya bukti di device: login Google nyata, kamera & debounce, simpan
