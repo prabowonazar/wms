@@ -735,7 +735,21 @@ Prasyarat: §15 sudah jalan dan indeks gabungan `transactions`
 3. Login ulang dengan akun yang sama → transaksi `pending` tetap ada dan
    terkirim setelah jaringan pulih.
 
-### 16.4 Bukti yang perlu dicatat
+### 16.4 Konflik saldo (VS3-04)
+
+1. Buat dua device dengan saldo berbeda untuk produk yang sama, lalu kirim
+   transaksi dari keduanya. Function membandingkan `deviceEndingQty` (dikirim
+   device) dengan `endingQty` server.
+2. Bila berbeda, dokumen `stockConflicts` berstatus `open` dibuat dan
+   `auditLogs` mencatat `stock_conflict.detected` — angka tidak diubah diam-diam.
+3. Supervisor membuka **Sinkronisasi**: bagian "Konflik saldo" menampilkan
+   device/server/delta. Pilih **Terima angka server** atau **Abaikan (eskalasi)**,
+   isi alasan ≥10 karakter, lalu **Simpan keputusan**.
+4. Coba sebagai operator: konflik tidak bisa dibaca/diubah. Coba alasan
+   pendek: rules menolak. Pembuatan adjustment otomatis dari konflik menyusul
+   di VS-5.
+
+### 16.5 Bukti yang perlu dicatat
 
 | Bukti | Cara |
 |---|---|
@@ -745,8 +759,9 @@ Prasyarat: §15 sudah jalan dan indeks gabungan `transactions`
 | Penolakan | `serverStatus` Firestore vs teks di SCR-20 |
 | Reversal ganda | jumlah dokumen reversal = 1 dan `auditLogs` |
 | Sesi 8 hari | pesan di SCR-01 + jumlah baris `pending` sebelum/sesudah login ulang |
+| Konflik | `stockConflicts` + `auditLogs` `stock_conflict.detected` dan `resolved` |
 
-> VS3-04 (konflik saldo) belum punya demo karena belum diimplementasikan;
-> lihat keterbatasan di `docs/vertical-slice-backlog.md` (VS-3).
+Semua tiket VS-3 sudah punya kode dan bukti test; angka NFR dan G3 baru
+terbukti setelah demo device di atas dijalankan.
 
 

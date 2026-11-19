@@ -131,7 +131,13 @@ class OutboxSyncService {
           try {
             // `alreadyExists` juga dihitung terkirim: dokumennya sudah ada,
             // jadi replay tidak pernah menggandakan baris.
-            await _remote.create(transaction);
+            await _remote.create(
+              transaction,
+              // Function membandingkan angka ini dengan saldo server (BR-12).
+              deviceEndingQty:
+                  (await _repository.balanceFor(transaction.productId))
+                      .endingQty,
+            );
             await _repository.markSynced(transaction.transactionId);
             sent++;
             sentIds.add(transaction.transactionId);
@@ -233,6 +239,15 @@ class OutboxSyncService {
     return _applyServerStates(
       rows.map((row) => row.transactionId).toList(growable: false),
     );
+  }
+
+  /// Tarik konflik saldo terbuka dari Firestore ke cache lokal (VS3-04).
+  ///
+  /// Hanya dipanggil untuk Supervisor; rules menolak pembacaan oleh operator.
+  Future<int> pullConflicts() async {
+    final conflicts = await _remote.openConflicts();
+    await _repository.replaceOpenConflicts(conflicts);
+    return conflicts.length;
   }
 
   Future<int> _applyServerStates(List<String> ids) async {

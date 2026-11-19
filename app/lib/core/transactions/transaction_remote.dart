@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 import '../config/app_config.dart';
+import 'stock_conflict.dart';
 import 'stock_transaction.dart';
 
 enum TransactionPushResult {
@@ -13,7 +14,21 @@ enum TransactionPushResult {
 
 /// Pengiriman satu transaksi ke penyimpanan pusat.
 abstract class TransactionRemote {
-  Future<TransactionPushResult> create(StockTransaction transaction);
+  Future<TransactionPushResult> create(
+    StockTransaction transaction, {
+    int? deviceEndingQty,
+  });
+
+  /// Daftar konflik saldo yang masih terbuka (khusus Supervisor).
+  Future<List<StockConflict>> openConflicts();
+
+  /// Menutup konflik dengan keputusan dan alasan Supervisor.
+  Future<void> resolveConflict(
+    String conflictId, {
+    required String resolution,
+    required String reason,
+    required String uid,
+  });
 
   /// Membaca status akhir dari server untuk [transactionIds].
   ///
@@ -53,10 +68,16 @@ class FirestoreTransactionRemote implements TransactionRemote {
   static const int _chunkSize = 30;
 
   @override
-  Future<TransactionPushResult> create(StockTransaction transaction) async {
+  Future<TransactionPushResult> create(
+    StockTransaction transaction, {
+    int? deviceEndingQty,
+  }) async {
     final reference =
         _firestore.collection('transactions').doc(transaction.transactionId);
-    final payload = buildTransactionPayload(transaction);
+    final payload = buildTransactionPayload(
+      transaction,
+      deviceEndingQty: deviceEndingQty,
+    );
 
     return _firestore.runTransaction<TransactionPushResult>((tx) async {
       final snapshot = await tx.get(reference);
@@ -99,6 +120,52 @@ class FirestoreTransactionRemote implements TransactionRemote {
     }
     return result;
   }
+
+  @override
+  Future<List<StockConflict>> openConflicts() async {
+    final snapshot = await _firestore
+        .collection('stockConflicts')
+        .where('status', isEqualTo: 'open')
+        .orderBy('detectedAt', descending: true)
+        .limit(20)
+        .get();
+    return snapshot.docs.map(_conflictFromDoc).toList(growable: false);
+  }
+
+  @override
+  Future<void> resolveConflict(
+    String conflictId, {
+    required String resolution,
+    required String reason,
+    required String uid,
+  }) async {
+    await _firestore.collection('stockConflicts').doc(conflictId).update(
+      <String, Object?>{
+        'status': resolution == 'ignore' ? 'ignored' : 'resolved',
+        'resolution': resolution,
+        'reason': reason,
+        'resolvedBy': uid,
+        'resolvedAt': DateTime.now().millisecondsSinceEpoch,
+      },
+    );
+  }
+
+  static StockConflict _conflictFromDoc(
+    QueryDocumentSnapshot<Map<String, Object?>> doc,
+  ) {
+    final data = doc.data();
+    final detected = data['detectedAt'];
+    return StockConflict(
+      conflictId: doc.id,
+      productId: (data['productId'] as String?) ?? '',
+      productCode: (data['productCode'] as String?) ?? '',
+      productName: (data['productName'] as String?) ?? '',
+      deviceEndingQty: (data['deviceEndingQty'] as int?) ?? 0,
+      serverEndingQty: (data['serverEndingQty'] as int?) ?? 0,
+      detectedAt: detected is Timestamp ? detected.toDate() : DateTime.now(),
+      transactionId: data['transactionId'] as String?,
+    );
+  }
 }
 
 /// Payload Firestore sesuai `docs/firestore-schema.md` §2.6 dan rules
@@ -106,7 +173,10 @@ class FirestoreTransactionRemote implements TransactionRemote {
 ///
 /// Tidak memuat `serverStatus`, `createdAtServer`, atau `syncedAt`: ketiganya
 /// ditulis Function, dan client dilarang mengirimkannya.
-Map<String, Object?> buildTransactionPayload(StockTransaction transaction) {
+Map<String, Object?> buildTransactionPayload(
+  StockTransaction transaction, {
+  int? deviceEndingQty,
+}) {
   final payload = <String, Object?>{
     'schemaVersion': transaction.schemaVersion,
     'warehouseId': transaction.warehouseId,
@@ -127,6 +197,12 @@ Map<String, Object?> buildTransactionPayload(StockTransaction transaction) {
     'appVersion': AppConfig.appVersion,
     'source': transaction.source,
   };
+
+  // VS3-04: angka saldo lokal setelah transaksi ini. Function membandingkan
+  // dengan saldo server dan mencatat stockConflicts bila berbeda (BR-12).
+  if (deviceEndingQty != null) {
+    payload['deviceEndingQty'] = deviceEndingQty;
+  }
 
   final note = transaction.note;
   if (note != null && note.isNotEmpty) {

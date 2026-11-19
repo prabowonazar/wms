@@ -243,7 +243,18 @@ service cloud.firestore {
 
     match /stockConflicts/{conflictId} {
       allow read: if isSupervisor();
-      allow write: if false;
+      // Deteksi dan penulisan awal hanya Function. Supervisor hanya boleh
+      // menutup konflik yang masih open, dengan alasan ≥10 karakter (BR-12).
+      allow create, delete: if false;
+      allow update: if isSupervisor()
+        && resource.data.status == 'open'
+        && request.resource.data.status in ['resolved', 'ignored']
+        && request.resource.data.resolution in
+            ['accept_server', 'adjust_to_device', 'ignore']
+        && request.resource.data.resolvedBy == request.auth.uid
+        && request.resource.data.resolvedAt is int
+        && request.resource.data.reason is string
+        && request.resource.data.reason.size() >= 10;
     }
 
     match /auditLogs/{logId} {

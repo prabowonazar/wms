@@ -170,6 +170,7 @@ menolak semua akses klien.
 | `serverStatus` | string | ✅ | `applied` \| `awaiting_approval` \| `rejected` — ditulis Function. VS-2 baru menulis `applied`/`rejected`; `awaiting_approval` disiapkan untuk alur approval VS-5 |
 | `appVersion` | string | ✅ | Diagnostik |
 | `source` | string | ✅ | `scan` \| `manual` \| `cycle_count` \| `server` |
+| `deviceEndingQty` | number | ❌ | VS-3: saldo lokal setelah transaksi, dipakai Function untuk deteksi `stockConflicts` (BR-12) |
 
 **Contoh:**
 
@@ -479,7 +480,28 @@ Function:
   - period berikutnya: opening = ending D-1
 ```
 
-### 5.5 Export Sheets (02:00 WIB)
+### 5.5 Konflik saldo device vs server (VS-3, BR-12)
+
+Client mengirim `deviceEndingQty` (saldo lokal setelah transaksi) bersama
+payload transaksi. Function membandingkannya dengan `endingQty` yang dihitung
+dari saldo server. Bila berbeda dan transaksi diterapkan:
+
+```
+stockConflicts/{autoId} = {
+  warehouseId, productId, productCode, productName, transactionId,
+  deviceEndingQty, serverEndingQty, delta,
+  status: 'open', detectedAt, schemaVersion: 1
+}
+auditLogs += stock_conflict.detected
+```
+
+Rules: hanya Function yang boleh membuat; Supervisor boleh mengubah baris
+`open` menjadi `resolved`/`ignored` dengan `resolution`, `reason` (≥10
+karakter), `resolvedBy`, dan `resolvedAt`. Operator tidak bisa membaca.
+Perangkat menyimpan salinan di `stock_conflicts_cache`; transaksi adjustment
+otomatis dari konflik menyusul di VS-5.
+
+### 5.6 Export Sheets (02:00 WIB)
 
 ```
 Function:
@@ -491,7 +513,7 @@ Function:
   - jika gagal → retry terjadwal 3× + alert
 ```
 
-### 5.6 Delta sync master produk ke device
+### 5.7 Delta sync master produk ke device
 
 ```
 App: query products where warehouseIds array-contains wid and updatedAt > lastSyncAt order by updatedAt limit 500
@@ -499,7 +521,7 @@ App: query products where warehouseIds array-contains wid and updatedAt > lastSy
      → simpan lastSyncAt
 ```
 
-### 5.7 Import produk dari sheet (callable `importProducts`)
+### 5.8 Import produk dari sheet (callable `importProducts`)
 
 ```
 Admin (app/Apps Script) → callable importProducts { warehouseId, fileId, batchIndex, rows[<=100] }

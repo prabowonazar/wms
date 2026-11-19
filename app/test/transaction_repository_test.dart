@@ -4,6 +4,7 @@ import 'package:warehouse_mobile/core/auth/auth_models.dart';
 import 'package:warehouse_mobile/core/master/product.dart';
 import 'package:warehouse_mobile/core/sync/uuid7.dart';
 import 'package:warehouse_mobile/core/transactions/stock_transaction.dart';
+import 'package:warehouse_mobile/core/transactions/stock_conflict.dart';
 import 'package:warehouse_mobile/core/transactions/transaction_repository.dart';
 
 import 'support/test_database.dart';
@@ -435,5 +436,29 @@ void main() {
     expect(await repository.discardFailed('tx-failed'), isTrue);
     final rows = await database.query('transactions');
     expect(rows.single['transaction_id'], 'tx-synced');
+  });
+
+  test('konflik saldo tersimpan di cache dan bisa ditutup supervisor', () async {
+    await repository.replaceOpenConflicts(<StockConflict>[
+      StockConflict(
+        conflictId: 'conflict-1',
+        productId: 'p1',
+        deviceEndingQty: 9,
+        serverEndingQty: 7,
+        detectedAt: DateTime.utc(2026, 11, 19),
+      ),
+    ]);
+
+    final open = await repository.openConflicts();
+    expect(open, hasLength(1));
+    expect(open.single.delta, 2);
+    expect(open.single.status, 'open');
+
+    await repository.markConflictResolved(
+      'conflict-1',
+      'accept_server',
+      'saldo server sesuai hitungan fisik',
+    );
+    expect(await repository.openConflicts(), isEmpty);
   });
 }

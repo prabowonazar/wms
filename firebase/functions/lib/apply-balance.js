@@ -120,10 +120,25 @@ function decideApply({
   return { action: 'apply', reason: '', endingQty, override: false };
 }
 
+/**
+ * VS3-04: device dan server boleh menyimpan angka berbeda. Selisih tidak
+ * pernah diperbaiki diam-diam; kasusnya dicatat untuk Supervisor (BR-12).
+ */
+function shouldFlagConflict(transaction, decision) {
+  if (!transaction || decision.action !== 'apply') {
+    return false;
+  }
+  const deviceQty = transaction.deviceEndingQty;
+  return Number.isInteger(deviceQty) &&
+    Number.isInteger(decision.endingQty) &&
+    deviceQty !== decision.endingQty;
+}
+
 module.exports = {
   TXN_TYPES,
   OVERRIDE_ROLES,
   MIN_OVERRIDE_REASON,
   expectedSignedQty,
   decideApply,
+  shouldFlagConflict,
 };

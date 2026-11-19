@@ -3,6 +3,7 @@ import 'package:sqflite_common/sqlite_api.dart';
 import '../auth/auth_models.dart';
 import '../master/product.dart';
 import '../sync/uuid7.dart';
+import 'stock_conflict.dart';
 import 'stock_transaction.dart';
 import 'sync_policy.dart';
 import 'sync_summary.dart';
@@ -334,6 +335,83 @@ class TransactionRepository {
     return rows.map(StockTransaction.fromRow).toList(growable: false);
   }
 
+  /// Cache konflik saldo milik gudang ini (BR-12).
+  ///
+  /// Function adalah satu-satunya penulis di Firestore; perangkat hanya
+  /// menyimpan salinan untuk ditampilkan Supervisor.
+  Future<void> replaceOpenConflicts(List<StockConflict> conflicts) async {
+    await _database.transaction((txn) async {
+      await txn.delete(
+        'stock_conflicts_cache',
+        where: 'warehouse_id = ? AND status = ?',
+        whereArgs: [_warehouseId, 'open'],
+      );
+      for (final conflict in conflicts) {
+        await txn.insert(
+          'stock_conflicts_cache',
+          <String, Object?>{
+            'conflict_id': conflict.conflictId,
+            'warehouse_id': _warehouseId,
+            'product_id': conflict.productId,
+            'device_ending_qty': conflict.deviceEndingQty,
+            'server_ending_qty': conflict.serverEndingQty,
+            'delta': conflict.delta,
+            'detected_at': conflict.detectedAt.millisecondsSinceEpoch,
+            'status': 'open',
+          },
+          conflictAlgorithm: ConflictAlgorithm.replace,
+        );
+      }
+    });
+  }
+
+  Future<List<StockConflict>> openConflicts() async {
+    final rows = await _database.query(
+      'stock_conflicts_cache',
+      where: 'warehouse_id = ? AND status = ?',
+      whereArgs: [_warehouseId, 'open'],
+      orderBy: 'detected_at DESC',
+      limit: 20,
+    );
+    return rows.map(_conflictFromRow).toList(growable: false);
+  }
+
+  /// Tandai konflik selesai di cache setelah server menerima resolusi.
+  Future<void> markConflictResolved(
+    String conflictId,
+    String resolution,
+    String reason,
+  ) async {
+    await _database.update(
+      'stock_conflicts_cache',
+      <String, Object?>{
+        'status': resolution == 'ignore' ? 'ignored' : 'resolved',
+        // Kolom resolution menyimpan "jenis|alasan" karena skema v1 tidak
+        // punya kolom reason tersendiri.
+        'resolution': '$resolution|$reason',
+      },
+      where: 'conflict_id = ?',
+      whereArgs: [conflictId],
+    );
+  }
+
+  static StockConflict _conflictFromRow(Map<String, Object?> row) {
+    final stored = (row['resolution'] as String?) ?? '';
+    final parts = stored.split('|');
+    final rawTime = row['detected_at'];
+    return StockConflict(
+      conflictId: row['conflict_id']! as String,
+      productId: (row['product_id'] as String?) ?? '',
+      deviceEndingQty: (row['device_ending_qty'] as int?) ?? 0,
+      serverEndingQty: (row['server_ending_qty'] as int?) ?? 0,
+      detectedAt: rawTime is int
+          ? DateTime.fromMillisecondsSinceEpoch(rawTime, isUtc: true)
+          : DateTime.fromMillisecondsSinceEpoch(0, isUtc: true),
+      resolution: parts.isEmpty ? null : parts.first,
+      reason: parts.length < 2 ? null : parts.sublist(1).join('|'),
+    );
+  }
+
   /// Ringkasan status untuk badge beranda dan SCR-20 (FR-SYN-03).
   Future<SyncSummary> syncSummary({int listLimit = 20, DateTime? now}) async {
     final counts = await _database.rawQuery(
@@ -347,12 +425,12 @@ class TransactionRepository {
 
     final dayStart = periodKeyFor(now ?? DateTime.now());
     final syncedRows = await _database.rawQuery(
-      "SELECT COUNT(*) AS total FROM transactions "
+      'SELECT COUNT(*) AS total FROM transactions '
       "WHERE warehouse_id = ? AND sync_status = 'synced' AND period_key = ?",
       [_warehouseId, dayStart],
     );
     final lastSyncedRows = await _database.rawQuery(
-      "SELECT MAX(synced_at) AS last FROM transactions "
+      'SELECT MAX(synced_at) AS last FROM transactions '
       "WHERE warehouse_id = ? AND sync_status = 'synced'",
       [_warehouseId],
     );

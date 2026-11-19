@@ -2,6 +2,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'package:warehouse_mobile/core/observability/telemetry.dart';
 import 'package:warehouse_mobile/core/transactions/outbox_sync.dart';
+import 'package:warehouse_mobile/core/transactions/stock_conflict.dart';
 import 'package:warehouse_mobile/core/transactions/transaction_remote.dart';
 import 'package:warehouse_mobile/core/transactions/transaction_repository.dart';
 
@@ -212,5 +213,25 @@ void main() {
     final row = (await database.query('transactions')).single;
     expect(row['sync_status'], 'failed');
     expect(row['last_error'], contains('stok tidak cukup di server'));
+  });
+
+  test('outbox mengirim saldo device dan menarik konflik ke cache', () async {
+    await seed(1);
+    remote.conflicts.add(
+      StockConflict(
+        conflictId: 'conflict-1',
+        productId: 'p1',
+        deviceEndingQty: 9,
+        serverEndingQty: 7,
+        detectedAt: DateTime.utc(2026, 11, 19),
+      ),
+    );
+
+    final result = await outbox.flush();
+
+    expect(result.sent, 1);
+    expect(remote.deviceEndingQties.single, 1);
+    expect(await outbox.pullConflicts(), 1);
+    expect(await repository.openConflicts(), hasLength(1));
   });
 }

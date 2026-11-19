@@ -106,7 +106,7 @@ class _LoginScreenState extends State<LoginScreen> {
                         ),
                       ),
                     ),
-                  if (message != null) ...[
+                  if (widget.message != null) ...[
                     Container(
                       padding: const EdgeInsets.all(12),
                       decoration: BoxDecoration(
@@ -117,7 +117,7 @@ class _LoginScreenState extends State<LoginScreen> {
                         children: [
                           const Icon(Icons.lock_clock),
                           const SizedBox(width: 8),
-                          Expanded(child: Text(message!)),
+                          Expanded(child: Text(widget.message!)),
                         ],
                       ),
                     ),

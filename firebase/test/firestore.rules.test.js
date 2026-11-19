@@ -511,6 +511,77 @@ describe('cycle count', () => {
   });
 });
 
+describe('konflik saldo', () => {
+  async function seedConflict(id) {
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+      await setDoc(doc(context.firestore(), `stockConflicts/${id}`), {
+        schemaVersion: 1,
+        warehouseId: 'wh1',
+        productId: 'p1',
+        productCode: 'P-001',
+        productName: 'Produk Uji',
+        transactionId: 'tx-conflict',
+        deviceEndingQty: 9,
+        serverEndingQty: 7,
+        delta: 2,
+        status: 'open',
+        detectedAt: Timestamp.now(),
+      });
+    });
+  }
+
+  function resolution(overrides = {}) {
+    return {
+      status: 'resolved',
+      resolution: 'accept_server',
+      resolvedBy: 'sv1',
+      resolvedAt: Date.now(),
+      reason: 'saldo server sudah cocok dengan hitungan fisik',
+      ...overrides,
+    };
+  }
+
+  it('supervisor bisa menutup konflik dengan alasan', async () => {
+    await seedConflict('conflict-ok');
+    await assertSucceeds(
+      updateDoc(
+        doc(authedDb('sv1'), 'stockConflicts/conflict-ok'),
+        resolution(),
+      ),
+    );
+  });
+
+  it('operator tidak bisa melihat atau mengubah konflik', async () => {
+    await seedConflict('conflict-op');
+    await assertFails(getDoc(doc(authedDb('op1'), 'stockConflicts/conflict-op')));
+    await assertFails(
+      updateDoc(
+        doc(authedDb('op1'), 'stockConflicts/conflict-op'),
+        resolution({ resolvedBy: 'op1' }),
+      ),
+    );
+  });
+
+  it('alasan kurang dari 10 karakter ditolak', async () => {
+    await seedConflict('conflict-short');
+    await assertFails(
+      updateDoc(
+        doc(authedDb('sv1'), 'stockConflicts/conflict-short'),
+        resolution({ reason: 'pendek' }),
+      ),
+    );
+  });
+
+  it('client tidak bisa membuat konflik palsu', async () => {
+    await seedConflict('conflict-client');
+    await assertFails(
+      setDoc(doc(authedDb('sv1'), 'stockConflicts/conflict-baru'), {
+        status: 'open',
+      }),
+    );
+  });
+});
+
 describe('konfigurasi aplikasi', () => {
   it('operator hanya bisa membaca appConfig', async () => {
     await testEnv.withSecurityRulesDisabled(async (context) => {

@@ -6,7 +6,7 @@ const { initializeApp } = require('firebase-admin/app');
 const { getFirestore, FieldValue } = require('firebase-admin/firestore');
 
 const { buildHealthPayload } = require('./lib/health');
-const { decideApply } = require('./lib/apply-balance');
+const { decideApply, shouldFlagConflict } = require('./lib/apply-balance');
 const {
   validateImportRows,
   buildImportId,
@@ -287,6 +287,36 @@ exports.applyBalance = onDocumentCreated(
         };
       }
       txn.update(snapshot.ref, updates);
+
+      if (shouldFlagConflict(data, decision)) {
+        const conflictRef = db.collection('stockConflicts').doc();
+        txn.set(conflictRef, {
+          schemaVersion: 1,
+          warehouseId,
+          productId,
+          productCode: data.productCode || '',
+          productName: data.productName || '',
+          transactionId: snapshot.id,
+          deviceEndingQty: data.deviceEndingQty,
+          serverEndingQty: decision.endingQty,
+          delta: data.deviceEndingQty - decision.endingQty,
+          status: 'open',
+          detectedAt: now,
+        });
+        txn.set(db.collection('auditLogs').doc(), {
+          action: 'stock_conflict.detected',
+          actorUid: 'system',
+          entity: 'stockConflicts',
+          entityId: conflictRef.id,
+          reason: 'device_ending_qty_mismatch',
+          before: { serverEndingQty: balance ? balance.endingQty ?? 0 : 0 },
+          after: {
+            deviceEndingQty: data.deviceEndingQty,
+            serverEndingQty: decision.endingQty,
+          },
+          at: now,
+        });
+      }
 
       txn.set(auditRef, {
         action: 'transaction.applied',

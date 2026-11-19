@@ -4,8 +4,10 @@ import 'package:flutter/material.dart';
 
 import '../../core/auth/auth_models.dart';
 import '../../core/transactions/outbox_sync.dart';
+import '../../core/transactions/stock_conflict.dart';
 import '../../core/transactions/stock_transaction.dart';
 import '../../core/transactions/sync_summary.dart';
+import '../../core/transactions/transaction_remote.dart';
 import '../../core/transactions/transaction_repository.dart';
 import 'sync_status_badge.dart';
 
@@ -16,11 +18,13 @@ class SyncScreen extends StatefulWidget {
     required this.repository,
     required this.outbox,
     required this.profile,
+    required this.remote,
   });
 
   final TransactionRepository repository;
   final OutboxSyncService outbox;
   final UserProfile profile;
+  final TransactionRemote remote;
 
   @override
   State<SyncScreen> createState() => _SyncScreenState();
@@ -28,9 +32,12 @@ class SyncScreen extends StatefulWidget {
 
 class _SyncScreenState extends State<SyncScreen> {
   SyncSummary? _summary;
+  List<StockConflict> _conflicts = const <StockConflict>[];
   bool _running = false;
   String? _progress;
   String? _error;
+
+  bool get _isSupervisor => widget.profile.role != UserRole.operator;
 
   StreamSubscription<OutboxSyncResult>? _subscription;
 
@@ -50,12 +57,21 @@ class _SyncScreenState extends State<SyncScreen> {
   }
 
   Future<void> _load() async {
+    if (_isSupervisor) {
+      try {
+        await widget.outbox.pullConflicts();
+      } on Object {
+        // Tetap tampilkan cache konflik terakhir bila sedang offline.
+      }
+    }
+    final conflicts = await widget.repository.openConflicts();
     final summary = await widget.repository.syncSummary();
     if (!mounted) {
       return;
     }
     setState(() {
       _summary = summary;
+      _conflicts = conflicts;
       _error = null;
     });
   }
@@ -145,6 +161,37 @@ class _SyncScreenState extends State<SyncScreen> {
     );
   }
 
+  Future<void> _resolveConflict(StockConflict conflict) async {
+    final choice = await showDialog<_ConflictResolution>(
+      context: context,
+      builder: (context) => const _ConflictDialog(),
+    );
+    if (choice == null) {
+      return;
+    }
+    try {
+      await widget.remote.resolveConflict(
+        conflict.conflictId,
+        resolution: choice.resolution,
+        reason: choice.reason,
+        uid: widget.profile.uid,
+      );
+      await widget.repository.markConflictResolved(
+        conflict.conflictId,
+        choice.resolution,
+        choice.reason,
+      );
+      await _load();
+      if (mounted) {
+        _showSnack('Konflik ditutup dan tercatat di audit log.');
+      }
+    } on Object {
+      if (mounted) {
+        _showSnack('Gagal menutup konflik. Periksa jaringan lalu coba lagi.');
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final summary = _summary;
@@ -216,6 +263,19 @@ class _SyncScreenState extends State<SyncScreen> {
                     const SizedBox(height: 8),
                     for (final transaction in summary.pendingItems)
                       _QueueTile(transaction: transaction),
+                  ],
+                  if (_isSupervisor && _conflicts.isNotEmpty) ...[
+                    const SizedBox(height: 20),
+                    Text(
+                      'Konflik saldo (${_conflicts.length})',
+                      style: Theme.of(context).textTheme.titleMedium,
+                    ),
+                    const SizedBox(height: 8),
+                    for (final conflict in _conflicts)
+                      _ConflictTile(
+                        conflict: conflict,
+                        onResolve: () => _resolveConflict(conflict),
+                      ),
                   ],
                   if (summary.allClear) ...[
                     const SizedBox(height: 32),
@@ -389,6 +449,140 @@ class _AllClear extends StatelessWidget {
           'Data tetap tersimpan di perangkat sampai server menerimanya.',
           textAlign: TextAlign.center,
           style: theme.textTheme.bodySmall,
+        ),
+      ],
+    );
+  }
+}
+
+class _ConflictResolution {
+  const _ConflictResolution({
+    required this.resolution,
+    required this.reason,
+  });
+
+  final String resolution;
+  final String reason;
+}
+
+class _ConflictTile extends StatelessWidget {
+  const _ConflictTile({required this.conflict, required this.onResolve});
+
+  final StockConflict conflict;
+  final VoidCallback onResolve;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final deltaLabel = conflict.delta > 0
+        ? '+${conflict.delta}'
+        : '${conflict.delta}';
+    return Card(
+      margin: const EdgeInsets.only(bottom: 8),
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(conflict.label, style: theme.textTheme.titleSmall),
+            const SizedBox(height: 6),
+            Text(
+              'Device ${conflict.deviceEndingQty} · '
+              'Server ${conflict.serverEndingQty} · Selisih $deltaLabel',
+              style: theme.textTheme.bodyMedium,
+            ),
+            if (conflict.transactionId != null)
+              Text(
+                'Transaksi pemicu: ${conflict.transactionId}',
+                style: theme.textTheme.bodySmall,
+              ),
+            const SizedBox(height: 8),
+            Align(
+              alignment: Alignment.centerRight,
+              child: FilledButton.tonal(
+                onPressed: onResolve,
+                child: const Text('Selesaikan'),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ConflictDialog extends StatefulWidget {
+  const _ConflictDialog();
+
+  @override
+  State<_ConflictDialog> createState() => _ConflictDialogState();
+}
+
+class _ConflictDialogState extends State<_ConflictDialog> {
+  String _resolution = 'accept_server';
+  final TextEditingController _reason = TextEditingController();
+
+  @override
+  void dispose() {
+    _reason.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final valid = _reason.text.trim().length >= 10;
+    return AlertDialog(
+      title: const Text('Selesaikan konflik saldo'),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          RadioListTile<String>(
+            value: 'accept_server',
+            groupValue: _resolution,
+            title: const Text('Terima angka server'),
+            onChanged: (value) {
+              if (value != null) {
+                setState(() => _resolution = value);
+              }
+            },
+          ),
+          RadioListTile<String>(
+            value: 'ignore',
+            groupValue: _resolution,
+            title: const Text('Abaikan (eskalasi ke admin)'),
+            onChanged: (value) {
+              if (value != null) {
+                setState(() => _resolution = value);
+              }
+            },
+          ),
+          TextField(
+            controller: _reason,
+            autofocus: true,
+            maxLength: 200,
+            onChanged: (_) => setState(() {}),
+            decoration: const InputDecoration(
+              labelText: 'Alasan (minimal 10 karakter)',
+              border: OutlineInputBorder(),
+            ),
+          ),
+        ],
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('Kembali'),
+        ),
+        FilledButton(
+          onPressed: valid
+              ? () => Navigator.of(context).pop(
+                    _ConflictResolution(
+                      resolution: _resolution,
+                      reason: _reason.text.trim(),
+                    ),
+                  )
+              : null,
+          child: const Text('Simpan keputusan'),
         ),
       ],
     );

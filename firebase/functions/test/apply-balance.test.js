@@ -6,6 +6,7 @@ const assert = require('node:assert/strict');
 const {
   expectedSignedQty,
   decideApply,
+  shouldFlagConflict,
 } = require('../lib/apply-balance');
 
 function txn(overrides = {}) {
@@ -238,4 +239,25 @@ test('reversal dengan jumlah bukan kebalikan ditolak', () => {
 
   assert.equal(result.action, 'reject');
   assert.equal(result.reason, 'reversal_qty_mismatch');
+});
+
+test('selisih saldo device dan server memicu konflik untuk ditinjau', () => {
+  const decision = { action: 'apply', endingQty: 7 };
+
+  assert.equal(
+    shouldFlagConflict({ deviceEndingQty: 9 }, decision),
+    true,
+  );
+  assert.equal(
+    shouldFlagConflict({ deviceEndingQty: 7 }, decision),
+    false,
+  );
+  assert.equal(
+    shouldFlagConflict({}, decision),
+    false,
+  );
+  assert.equal(
+    shouldFlagConflict({ deviceEndingQty: 9 }, { action: 'reject' }),
+    false,
+  );
 });

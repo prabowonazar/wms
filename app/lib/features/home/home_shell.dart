@@ -127,6 +127,7 @@ class _HomeShellState extends State<HomeShell> {
           repository: _transactions,
           outbox: _outbox,
           profile: widget.profile,
+          remote: widget.services.transactionRemote,
         ),
       ),
     );

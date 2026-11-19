@@ -248,20 +248,21 @@ test Functions lulus.
 
 **Status implementasi (19 Nov 2026; menunggu CI):**
 
-| Tiket | Kode | Bukti | Device |
+| Area | Kode | Bukti | Device |
 |---|---|---|---|
-| VS3-01 | `SyncStatusBadge` + chip di `HomeShell` + `SyncScreen` (4 status, alasan, badge) | widget/unit test | **belum** |
-| VS3-02 | Tombol SYNC SEKARANG di SCR-20, progres `Mengirim x/y`, guard dobel-trigger | widget test | **belum** |
-| VS3-03 | `sync_policy.dart`: backoff 30/60/120/240 s, berhenti di 5; `retryNow`, `discardFailed`, penolakan server ditarik lewat `fetchStates` | unit test | **belum** |
-| VS3-04 | **Belum dikerjakan.** Konflik saldo butuh deteksi di Function (`deviceEndingQty`) + alur resolusi Supervisor; tabel `stock_conflicts_cache` sudah ada di skema v1 | — | — |
-| VS3-05 | `recordReversal` lokal + guard server di `applyBalance` (asli harus `applied`, belum di-reverse, qty kebalikan) + audit log | unit test | **belum** |
-| VS3-06 | `HistoryScreen` (SCR-10/11): filter 7/30 hari, jenis, kode produk; operator hanya miliknya; pagination 50 | widget/unit test | **belum** |
-| VS3-07 | `offlineSessionLimit = 7 hari` di `AuthRepository`; pesan sesi berakhir di SCR-01; transaksi pending tidak dihapus | unit test | **belum** |
+| Status & chip | `SyncStatusBadge` + chip di `HomeShell` + `SyncScreen` (4 status, alasan, badge) | widget/unit test | **belum** |
+| Sync manual | Tombol SYNC SEKARANG di SCR-20, progres `Mengirim x/y`, guard dobel-trigger | widget test | **belum** |
+| Retry & kegagalan | `sync_policy.dart`: backoff 30/60/120/240 s, berhenti di 5; `retryNow`, `discardFailed`, penolakan server ditarik lewat `fetchStates` | unit test | **belum** |
+| Konflik saldo | Function membandingkan `deviceEndingQty` dengan saldo server, membuat `stockConflicts`; Supervisor menutup lewat rules dengan alasan ≥10 karakter di SCR-20 | unit test + rules test | **belum** |
+| Reversal | `recordReversal` lokal + guard server di `applyBalance` (asli harus `applied`, belum di-reverse, qty kebalikan) + audit log | unit test | **belum** |
+| Histori | `HistoryScreen` (SCR-10/11): filter 7/30 hari, jenis, kode produk; operator hanya miliknya; pagination 50 | widget/unit test | **belum** |
+| Sesi offline | `offlineSessionLimit = 7 hari` di `AuthRepository`; pesan sesi berakhir di SCR-01; transaksi pending tidak dihapus | unit test | **belum** |
 
 > **Keterbatasan VS-3 yang disengaja:**
-> 1. VS3-04 (konflik saldo) belum diimplementasikan. Sampai selesai, device
->    yang saldonya menyimpang dari server belum menghasilkan entri
->    `stockConflicts`; gunakan histori + `auditLogs` untuk penelusuran.
+> 1. Opsi "buat adjustment dari konflik" (`adjust_to_device`) baru tersedia
+>    sebagai resolution di rules; pembuatan transaksi adjustment otomatis
+>    menyusul bersama alur cycle-count VS-5. Untuk VS-3, Supervisor memilih
+>    "Terima angka server" atau "Abaikan (eskalasi)".
 > 2. WorkManager masih belum dipakai (lanjutan VS2-03): pengiriman otomatis
 >    hanya saat app di depan.
 > 3. Semua bukti di atas berasal dari CI/unit/widget test; angka NFR dan
