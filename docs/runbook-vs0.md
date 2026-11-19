@@ -309,7 +309,7 @@ Yang harus hijau:
 | `test/uuid7_test.dart` | Format/versi/varian UUIDv7, urutan waktu, injeksi clock |
 | `test/transaction_repository_test.dart` | Ledger lokal: tanda, saldo, override, idempoten, immutability, stock card, outbox |
 | `test/outbox_sync_test.dart` | Flush 300 transaksi, replay, jaringan mati, lanjut setelah pulih |
-| `test/movement_flow_test.dart` | Widget SCR-04/08/09: keluar, stok tidak cukup, override supervisor, qty 0 |
+| `test/movement_flow_test.dart` | Widget SCR-04/08/09: keluar, stok tidak cukup, override supervisor, alasan <10 karakter ditolak, qty 0 |
 
 Catatan Windows: `sqflite_common_ffi` membutuhkan `sqlite3.dll` yang kompatibel.
 Bila test FFI gagal dengan pesan "sqlite3.dll not found", jalankan di CI (Ubuntu)
@@ -458,11 +458,11 @@ Jangan commit: `dart_defines/`, `google-services.json`, service account, `*.jks`
 | Tidak ada kredensial ter-commit | Ya |
 | Skrip ASCII | Ya |
 | `flutter pub get` | **Lolos di CI** (Flutter 3.32.5; `sqflite_sqlcipher` dipin 3.3.0) |
-| `flutter analyze` | **Bersih di CI** (run terakhir VS-1) |
-| `flutter test` | **90 test** (VS-1: 60; VS-2 menambah 5 UUID, 14 repository, 6 outbox, 5 widget movement) |
+| `flutter analyze` | **Bersih di CI** - `No issues found!` (run #18) |
+| `flutter test` | **90 test lolos di CI** (VS-1: 60; VS-2 menambah 5 UUID, 14 repository, 6 outbox, 5 widget movement) |
 | Build APK Android | **Lolos di CI** sebagai smoke build (Android di-scaffold, minSdk 26, compileSdk 36, NDK 27); bukan bukti konfigurasi final |
-| Rules test emulator | **37 kasus** (VS-2 menambah 2 kasus approval) |
-| Functions unit test | **22 test** (12 VS-1 + 10 `apply-balance`) |
+| Rules test emulator | **37 kasus lolos di CI** (VS-2 menambah 2 kasus approval) |
+| Functions unit test | **22 test lolos di CI** (12 VS-1 + 10 `apply-balance`) |
 | Versi paket terkunci (`pubspec.lock`) | Diambil dari artifact CI lalu di-commit (77 paket) |
 | Login Google nyata di device | **Belum dijalankan** (butuh project dev + SHA-1) |
 | SQLCipher di device | **Belum dibuktikan** (baru desain + test non-enkripsi via FFI) |
@@ -472,16 +472,16 @@ Jangan commit: `dart_defines/`, `google-services.json`, service account, `*.jks`
 | Core loop VS-2 (simpan ≤1,5 s, offline → synced, saldo turun) | **Belum dibuktikan di device**; baru unit/widget test dengan remote palsu |
 | Exactly-once VS-2 (300 transaksi, replay, drift 0) | **Belum dibuktikan end-to-end**; unit test remote palsu lulus, trigger Firestore belum dijalankan di emulator |
 
-> Angka 90/37/22 berasal dari kode di commit VS-2 dan baru menjadi bukti setelah
-> CI run VS-2 hijau (§9). Bila CI menampilkan angka berbeda, perbaiki tabel ini
-> pada commit yang sama dengan perbaikannya.
+> Angka 90/37/22 dibuktikan oleh CI run #18 (`503465f`) yang keempat job-nya
+> hijau. Bila CI menampilkan angka berbeda, perbaiki tabel ini pada commit yang
+> sama dengan perbaikannya.
 
-Bukti CI terakhir: run #12 (`d08e373`) keempat job hijau. Detail per job:
+Bukti CI terakhir: run #18 (`503465f`) keempat job hijau. Detail per job:
 
-- `Flutter analyze & test`: `No issues found!` + 60 test lulus, coverage terunggah.
+- `Flutter analyze & test`: `No issues found!` + 90 test lulus, coverage terunggah.
 - `Build debug APK`: `app-debug.apk` terbangun dan terunggah sebagai artifact.
-- `Firestore rules test`: 35 kasus lulus.
-- `Functions syntax & unit test`: 12 test lulus.
+- `Firestore rules test`: 37 kasus lulus.
+- `Functions syntax & unit test`: 22 test lulus.
 
 Riwayat CI (semua kegagalan sudah diperbaiki dan dibuktikan ulang):
 
@@ -497,6 +497,12 @@ Riwayat CI (semua kegagalan sudah diperbaiki dan dibuktikan ulang):
 | #10 | gagal | widget test scan terhapus oleh full sync di `initState`; AGP scaffold < 8.9.1; nama test Functions tidak memicu aturan yang diuji |
 | #11 | **hijau** | full sync non-destruktif (hapus mirror setelah halaman pertama), AGP 8.9.1, 60 test |
 | #12 | **hijau** | kuota impor per file (`fileId` + `batchIndex`), 12 test Functions |
+| #13 | **hijau** | `pubspec.lock` terkunci + status VS-1 yang jujur |
+| #14 | **hijau** | angka kasus rules terbaru di runbook |
+| #15 | gagal | analyzer: 2 info `prefer_single_quotes` di query outbox (info tetap membuat exit 1) |
+| #16 | gagal | 85 lulus, 5 gagal: tombol `Keluar` tidak memilih jenis transaksi, sehingga `KELUAR` tidak ditemukan |
+| #17 | gagal | 87 lulus, 3 gagal: spinner tetap berputar saat dialog stok tidak cukup, `pumpAndSettle` timeout |
+| #18 | **hijau** | bukti VS-2: analyze bersih, 90 test, APK, 37 rules, 22 Functions |
 
 ---
 

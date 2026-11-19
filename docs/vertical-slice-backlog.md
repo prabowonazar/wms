@@ -197,15 +197,17 @@ graph LR
 
 **Exit (G2):** exactly-once terbukti di project dev dengan 2 device bersamaan; tidak ada drift saldo setelah 1.000 transaksi.
 
-**Status implementasi (19 Nov 2026):**
+**Status implementasi (19 Nov 2026).** Seluruh angka kolom CI dibuktikan oleh
+CI run #18 (`503465f`): analyze bersih, 90 test Flutter, 37 test rules, dan 22
+test Functions lulus.
 
 | Area | Kode | CI | Device |
 |---|---|---|---|
-| Lembar transaksi | `MovementSheet` (SCR-04) + `ProductSheet` (SCR-13); qty default 1 sehingga scan → Keluar → Simpan = 3 tap | 2 widget test lulus | **belum** |
+| Lembar transaksi | `MovementSheet` (SCR-04) + `ProductSheet` (SCR-13); qty default 1 sehingga scan → Keluar → Simpan = 3 tap | 5 widget test lulus | **belum** |
 | Submit idempoten | `Uuid7` + `TransactionRepository.recordMovement` (satu transaksi SQLite, PK `transaction_id`) | 14 unit test + 5 test UUID | **belum** (tap ganda & force-stop belum diuji nyata) |
 | Outbox | `OutboxSyncService`: flush saat app dibuka, setelah simpan, lalu tiap 60 detik selama app di depan. **Bukan WorkManager** | 6 unit test (termasuk 300 transaksi + replay) | **belum** |
 | Function `applyBalance` | `lib/apply-balance.js` + trigger `onDocumentCreated`; replay guard `lastTransactionId` | 10 unit test Functions | **belum** (butuh project dev; emulator belum menjalankan trigger) |
-| Stok negatif & override | SCR-08 + dialog SCR-09; hanya supervisor/admin; alasan wajib ≥10 karakter; `approval.pending` diputuskan server | 2 unit + 3 widget test + 2 test rules | **belum** |
+| Stok negatif & override | SCR-08 + dialog SCR-09; hanya supervisor/admin; alasan wajib ≥10 karakter; `approval.pending` diputuskan server | 2 unit + 5 widget test + 2 test rules | **belum** |
 | Saldo & stock card lokal | `v_product_balance` + `v_stock_card` + layar stok (SCR-12) | 14 unit test + 2 test view skema | **belum** (NFR ≤1 s belum diukur) |
 
 > **Keterbatasan VS-2 yang disengaja:**

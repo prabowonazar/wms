@@ -17,8 +17,9 @@ pencarian lokal, ledger lokal + outbox idempoten, lembar masuk/keluar, saldo
 & stock card, CI, dan runbook.
 
 > Mesin ini tidak punya Flutter/Dart/Node/Java, jadi seluruh bukti kompilasi
-> datang dari CI GitHub Actions: `flutter analyze` bersih, 90 test Flutter,
-> APK debug terbangun, 37 test rules, dan 22 test Functions. Yang masih terbuka
+> datang dari CI GitHub Actions (run #18, commit `503465f`): `flutter analyze`
+> bersih, 90 test Flutter, APK debug terbangun, 37 test rules, dan 22 test
+> Functions lulus. Yang masih terbuka
 > hanya bukti di device: login Google nyata, kamera & debounce, simpan
 > transaksi ≤1,5 s, airplane mode → `synced`, override supervisor, SQLCipher,
 > Crashlytics, serta angka NFR (lookup p95, scan→tampil, sync 2.000 SKU).
