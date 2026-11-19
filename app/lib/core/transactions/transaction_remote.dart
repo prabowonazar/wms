@@ -151,7 +151,7 @@ class FirestoreTransactionRemote implements TransactionRemote {
   }
 
   static StockConflict _conflictFromDoc(
-    QueryDocumentSnapshot<Map<String, Object?>> doc,
+    QueryDocumentSnapshot<Map<String, dynamic>> doc,
   ) {
     final data = doc.data();
     final detected = data['detectedAt'];
