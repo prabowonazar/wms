@@ -42,6 +42,7 @@
 | Beranda (VS-3) | `app/lib/features/home/home_shell.dart` | Navigasi Scan/Histori/Stok/Lainnya + chip status sync |
 | Laporan (VS-4) | `firebase/functions/lib/period-close.js`, `sheet-export.js`, `sheets-client.js` | Closing 00:05, ekspor 02:00, rekonsiliasi 02:30 WIB |
 | Admin (VS-4) | `app/lib/core/admin/**`, `features/admin/**` | Callable user & retry paksa, layar monitoring admin |
+| Cycle count (VS-5) | `app/lib/core/cycle_count/**`, `features/cycle_count/**`, `functions/lib/cycle-count.js` | Sesi hitung fisik, variance, approval adjustment idempoten |
 | CI | `.github/workflows/ci.yml` | analyze/test/APK, Functions, rules emulator |
 | Verifikasi | `tools/verify-vs0.ps1` | Pemeriksaan statis + opsi `-RunTests` |
 | Verifikasi skema | `tools/verify-schema-sqlite.ps1` | Menjalankan `sqlite_schema.sql` di SQLite 3.43.2 nyata (Windows, tanpa toolchain) |
@@ -336,6 +337,7 @@ Yang harus hijau:
 | `test/auth_session_test.dart` | Batas sesi offline 7 hari, cache `fetched_at`, backoff & pesan error |
 | `test/outbox_sync_test.dart` | VS-3: retry habis di 5, retry manual, penolakan server, `syncNow` menarik status |
 | Functions `test/apply-balance.test.js` | VS-3: reversal sah, asli belum `applied`, reversal ganda, qty bukan kebalikan |
+| `test/cycle_count_repository_test.dart` | VS-5: satu sesi open, autosave/update baris, auto-fill, auto-approve, recount |
 
 Catatan Windows: `sqflite_common_ffi` membutuhkan `sqlite3.dll` yang kompatibel.
 Bila test FFI gagal dengan pesan "sqlite3.dll not found", jalankan di CI (Ubuntu)
@@ -399,6 +401,7 @@ deploy tetap membutuhkan dependency.
 | `test/period-close.test.js` | WIB, D-1, checksum, stock card seimbang, snapshot (5 kasus) |
 | `test/sheet-export.test.js` | baris applied, idempotensi, rekonsiliasi verified/partial/tampered (5 kasus) |
 | `test/admin.test.js` | izin admin, validasi perubahan user, validasi retry (3 kasus) |
+| `test/cycle-count.test.js` | variance, ringkasan sesi, rencana adjustment, approval idempoten (6 kasus) |
 
 ---
 
@@ -858,5 +861,57 @@ firebase deploy --only functions,firestore:indexes
 2. Catat waktu tampil (target ≤2 s pada device mid-range).
 
 > Ekspor PDF/CSV (VS4-07) sengaja dipotong; Sheets adalah jalur ekspor pilot.
+
+---
+
+## 18. Demo VS-5 (cycle count → adjustment → approval)
+
+Prasyarat: minimal 2 produk sudah tersinkron ke device; Functions terbaru
+di-deploy; akun Supervisor/Admin tersedia.
+
+### 18.1 Sesi & hitung fisik
+
+1. Operator membuka **Lainnya → Cycle count** → **Mulai sesi baru**. Coba
+   membuat sesi kedua dari device lain: ditolak dengan pesan sesi sudah aktif
+   (BR-10).
+2. Pilih produk, isi jumlah fisik yang berbeda dari `systemQty`, **Simpan
+   hitungan**. Ulangi untuk produk yang sama → baris yang sama diperbarui,
+   bukan ditambah.
+3. Matikan airplane mode saat mengisi; kill aplikasi lalu buka lagi → progres
+   masih ada (tersimpan di SQLite).
+
+### 18.2 Review & submit
+
+1. **Review & submit**: produk yang belum dihitung otomatis terisi
+   `countedQty = systemQty` dengan catatan "tidak dihitung".
+2. Periksa `variance = counted − system` dan total selisih di ringkasan.
+3. Bila semua variance nol → status langsung `approved`, tidak ada transaksi
+   `adjustment`. Catat angka ini untuk M1.
+
+### 18.3 Approval
+
+1. Supervisor membuka daftar sesi `submitted` → **Setujui**. Periksa:
+   - satu transaksi `adjustment` per baris variance (doc ID
+     `${sessionId}_${productId}`);
+   - `balances.endingQty` = jumlah fisik;
+   - sesi `approved`, `countLines.approvalStatus='approved'`;
+   - `auditLogs` memuat `cycleCount.approve`.
+2. Klik **Setujui** dua kali → tidak ada adjustment baru (idempoten).
+3. Uji **Tolak** dengan alasan <10 karakter → tombol nonaktif; dengan alasan
+   cukup → sesi kembali `open` untuk recount dan `auditLogs` memuat
+   `cycleCount.reject`.
+
+### 18.4 Bukti yang perlu dicatat
+
+| Bukti | Cara |
+|---|---|
+| Akurasi M1 | `countedQty` vs saldo server sesudah approval (target selisih 0) |
+| Durasi M7 | stopwatch mulai sesi sampai submit, per sesi |
+| Idempotensi | jumlah dokumen adjustment = jumlah baris variance |
+| Audit | `cycleCount.approve` / `cycleCount.reject` di `auditLogs` |
+
+> VS5-06 (tab konflik di layar persetujuan) belum dibuat terpisah; daftar
+> konflik Supervisor tetap tersedia di SCR-20.
+
 
 

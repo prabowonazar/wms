@@ -340,6 +340,27 @@ test Functions lulus.
 
 **Exit (G5):** 3 sesi nyata di gudang uji; selisih saldo vs fisik **0**; audit lengkap.
 
+**Status implementasi (19 Nov 2026; menunggu CI):**
+
+| Area | Kode | Bukti | Device |
+|---|---|---|---|
+| Sesi & BR-10 | `CycleCountRepository.startSession`: satu sesi `open` per gudang, idempoten, bisa offline | 1 unit test | **belum** |
+| Hitung fisik & autosave | `saveLine`: `systemQty` snapshot, hitung ulang = update baris, progres di SQLite | 1 unit test | **belum** |
+| Review & submit | auto-fill produk tak terhitung; `variance = counted − system`; `submitted` atau langsung `approved` bila semua nol | 2 unit test | **belum** |
+| Approval & adjustment | callable `approveCycleCount`/`rejectCycleCount`; adjustment deterministik `${sessionId}_${productId}`; approve 2× = 1 set; reject wajib alasan | 6 unit test | **belum** |
+| Status & recount | `rejected -> open` lewat `reopen`; status akhir tersimpan lokal | 1 unit test | **belum** |
+| Tab konflik di approval | Belum ada tab khusus di layar persetujuan; daftar konflik tetap tersedia di SCR-20 untuk Supervisor | — | — |
+| M1/M7 | Belum diukur; butuh 3 sesi nyata di gudang uji | — | — |
+
+> **Keterbatasan VS-5:**
+> 1. Sesi hanya dikirim saat submit / tombol Kirim ulang / app dibuka. Tanpa
+>    WorkManager, sesi yang dibuat offline baru sampai server setelah app
+>    dibuka lagi (sama seperti VS2-03).
+> 2. Auto-approve (semua variance nol) terjadi lokal; status akhir di server
+>    menyusul setelah sesi tersinkron.
+> 3. Approval mensyaratkan sesi sudah ada di Firestore; sesi yang masih lokal
+>    tidak muncul di daftar Supervisor sampai tersinkron.
+
 ---
 
 ### VS-6 — Hardening & kesiapan rollout
