@@ -20,6 +20,7 @@ const {
   validateUserUpdate,
   validateRetryRequest,
 } = require('./lib/admin');
+const { decideApproval } = require('./lib/cycle-count');
 const {
   previousPeriodKey,
   buildStockCards,
@@ -1026,4 +1027,159 @@ exports.adminForceRetry = onCall({ region: REGION }, async (request) => {
     at: FieldValue.serverTimestamp(),
   });
   return { ok: true, transactionId: result.transactionId };
+});
+
+// ---------------------------------------------------------------------------
+// VS-5: cycle-count -> adjustment -> approval
+// ---------------------------------------------------------------------------
+
+async function cycleReviewerRole(request) {
+  const role = await requestRole(request);
+  if (!isAdmin(role) && role !== 'supervisor') {
+    throw new HttpsError('permission-denied', 'Hanya Supervisor/Admin yang boleh meninjau.');
+  }
+  return role;
+}
+
+async function writeAdjustment(session, adjustment, reviewerUid) {
+  // ID deterministik: retry/approve 2x tidak pernah membuat adjustment ganda.
+  const id = `${session.id}_${adjustment.productId}`;
+  const ref = db.collection('transactions').doc(id);
+  const now = new Date();
+  const payload = {
+    schemaVersion: 1,
+    warehouseId: session.warehouseId,
+    productId: adjustment.productId,
+    productCode: adjustment.productCode,
+    productName: adjustment.productName,
+    productType: 'general',
+    uom: adjustment.uom,
+    type: 'adjustment',
+    qty: adjustment.qty,
+    signedQty: adjustment.signedQty,
+    periodKey: adjustment.periodKey,
+    userId: reviewerUid,
+    userName: reviewerUid,
+    deviceId: 'server',
+    occurredAt: now,
+    createdAtClient: now,
+    source: 'cycle_count',
+    cycleCountId: session.id,
+    note: adjustment.note,
+  };
+  try {
+    await ref.create(payload);
+  } catch (error) {
+    if (error.code !== 6) {
+      throw error; // 6 = ALREADY_EXISTS
+    }
+  }
+  await applyTransactionToBalance(await ref.get());
+  return id;
+}
+
+/** Setujui sesi: satu adjustment per baris variance, idempoten. */
+exports.approveCycleCount = onCall({ region: REGION }, async (request) => {
+  const role = await cycleReviewerRole(request);
+  const sessionId = request.data && request.data.sessionId;
+  if (typeof sessionId !== 'string' || sessionId.trim() === '') {
+    throw new HttpsError('invalid-argument', 'missing_session_id');
+  }
+  const ref = db.collection('cycleCounts').doc(sessionId.trim());
+  const sessionDoc = await ref.get();
+  if (!sessionDoc.exists) {
+    throw new HttpsError('not-found', 'session_not_found');
+  }
+  const session = { id: ref.id, ...sessionDoc.data() };
+  const lineSnapshot = await ref.collection('countLines').get();
+  const lines = lineSnapshot.docs.map((doc) => ({
+    productId: doc.id,
+    ...doc.data(),
+  }));
+  const decision = decideApproval(session, lines);
+  if (decision.action === 'noop') {
+    return { ok: true, adjustments: 0, alreadyApproved: true };
+  }
+  if (decision.action !== 'approve' && decision.action !== 'auto_approve') {
+    throw new HttpsError('failed-precondition', decision.reason);
+  }
+
+  const adjustmentIds = [];
+  for (const adjustment of decision.adjustments) {
+    adjustmentIds.push(
+      await writeAdjustment(session, adjustment, request.auth.uid),
+    );
+  }
+  const now = FieldValue.serverTimestamp();
+  await ref.update({
+    status: 'approved',
+    reviewedBy: request.auth.uid,
+    reviewedAt: now,
+    adjustmentTxnIds: adjustmentIds,
+    varianceLineCount: decision.summary.varianceLineCount,
+    totalVarianceQty: decision.summary.totalVarianceQty,
+  });
+  const lineWrites = db.batch();
+  for (const line of lines) {
+    const variance = Number.isInteger(line.variance)
+      ? line.variance
+      : line.countedQty - line.systemQty;
+    if (variance === 0) {
+      continue;
+    }
+    lineWrites.update(ref.collection('countLines').doc(line.productId), {
+      approvalStatus: 'approved',
+      adjustmentTxnId: `${session.id}_${line.productId}`,
+    });
+  }
+  if (lines.some((line) =>
+      (Number.isInteger(line.variance)
+        ? line.variance
+        : line.countedQty - line.systemQty) !== 0)) {
+    await lineWrites.commit();
+  }
+  await db.collection('auditLogs').add({
+    action: 'cycleCount.approve',
+    actorUid: request.auth.uid,
+    actorRole: role,
+    entityType: 'cycleCounts',
+    entityId: session.id,
+    reason: `Disetujui: ${adjustmentIds.length} adjustment`,
+    after: { adjustmentTxnIds: adjustmentIds },
+    at: now,
+  });
+  return { ok: true, adjustments: adjustmentIds.length };
+});
+
+/** Tolak sesi wajib alasan; sesi bisa dibuka lagi untuk recount. */
+exports.rejectCycleCount = onCall({ region: REGION }, async (request) => {
+  await cycleReviewerRole(request);
+  const sessionId = request.data && request.data.sessionId;
+  const reason = request.data && request.data.reason;
+  if (typeof sessionId !== 'string' || sessionId.trim() === '') {
+    throw new HttpsError('invalid-argument', 'missing_session_id');
+  }
+  if (typeof reason !== 'string' || reason.trim().length < 10) {
+    throw new HttpsError('invalid-argument', 'reason_too_short');
+  }
+  const ref = db.collection('cycleCounts').doc(sessionId.trim());
+  const snapshot = await ref.get();
+  if (!snapshot.exists || snapshot.get('status') !== 'submitted') {
+    throw new HttpsError('failed-precondition', 'session_not_submitted');
+  }
+  await ref.update({
+    status: 'rejected',
+    reviewedBy: request.auth.uid,
+    reviewedAt: FieldValue.serverTimestamp(),
+    note: reason.trim(),
+  });
+  await db.collection('auditLogs').add({
+    action: 'cycleCount.reject',
+    actorUid: request.auth.uid,
+    entityType: 'cycleCounts',
+    entityId: sessionId.trim(),
+    reason: reason.trim(),
+    at: FieldValue.serverTimestamp(),
+  });
+  return { ok: true };
 });

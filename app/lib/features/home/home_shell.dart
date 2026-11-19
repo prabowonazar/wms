@@ -1,11 +1,15 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 import '../../bootstrap/app_services.dart';
 import '../../core/admin/admin_remote.dart';
 import '../../core/auth/auth_models.dart';
 import '../../core/config/app_config.dart';
+import '../../core/cycle_count/cycle_count_repository.dart';
+import '../../core/cycle_count/cycle_count_remote.dart';
+import '../../core/cycle_count/cycle_count_sync.dart';
 import '../../core/master/master_sync.dart';
 import '../../core/master/product_repository.dart';
 import '../../core/transactions/outbox_sync.dart';
@@ -13,6 +17,7 @@ import '../../core/transactions/sync_summary.dart';
 import '../../core/transactions/transaction_repository.dart';
 import '../history/history_screen.dart';
 import '../admin/admin_screen.dart';
+import '../cycle_count/cycle_count_screen.dart';
 import '../scan/product_sheet.dart';
 import '../scan/scan_screen.dart';
 import '../stock/stock_list_screen.dart';
@@ -69,6 +74,16 @@ class _HomeShellState extends State<HomeShell> {
     telemetry: widget.services.telemetry,
   );
 
+  late final CycleCountRepository _cycleCounts = CycleCountRepository(
+    database: widget.services.database,
+    warehouseId: widget.profile.warehouseId,
+  );
+
+  late final CycleCountSyncService _cycleCountSync = CycleCountSyncService(
+    repository: _cycleCounts,
+    remote: FirestoreCycleCountRemote(FirebaseFirestore.instance),
+  );
+
   Timer? _timer;
   Timer? _outboxTimer;
   StreamSubscription<OutboxSyncResult>? _subscription;
@@ -77,6 +92,7 @@ class _HomeShellState extends State<HomeShell> {
   void initState() {
     super.initState();
     unawaited(_outbox.flush());
+    unawaited(_cycleCountSync.flushPending());
     unawaited(_loadSummary());
     _subscription = _outbox.results.listen((_) => unawaited(_loadSummary()));
     _timer = Timer.periodic(
@@ -148,6 +164,20 @@ class _HomeShellState extends State<HomeShell> {
     );
   }
 
+  Future<void> _openCycleCount() async {
+    await Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => CycleCountScreen(
+          repository: _cycleCounts,
+          sync: _cycleCountSync,
+          products: _products,
+          remote: const FirestoreCycleCountRemote(FirebaseFirestore.instance),
+          profile: widget.profile,
+        ),
+      ),
+    );
+  }
+
   Future<void> _openAdmin() async {
     await Navigator.of(context).push(
       MaterialPageRoute<void>(
@@ -214,6 +244,7 @@ class _HomeShellState extends State<HomeShell> {
             summary: _summary,
             onOpenSync: _openSync,
             onOpenDashboard: _openDashboard,
+            onOpenCycleCount: _openCycleCount,
             onOpenAdmin: _openAdmin,
             onOpenSettings: _openSettings,
             onSignOut: widget.services.auth.signOut,
@@ -308,6 +339,7 @@ class MoreScreen extends StatelessWidget {
     required this.summary,
     required this.onOpenSync,
     required this.onOpenDashboard,
+    required this.onOpenCycleCount,
     required this.onOpenAdmin,
     required this.onOpenSettings,
     required this.onSignOut,
@@ -317,6 +349,7 @@ class MoreScreen extends StatelessWidget {
   final SyncSummary? summary;
   final VoidCallback onOpenSync;
   final VoidCallback onOpenDashboard;
+  final VoidCallback onOpenCycleCount;
   final VoidCallback onOpenAdmin;
   final VoidCallback onOpenSettings;
   final Future<void> Function() onSignOut;
@@ -373,6 +406,12 @@ class MoreScreen extends StatelessWidget {
             title: const Text('Dashboard'),
             subtitle: const Text('Ringkasan produk & transaksi hari ini'),
             onTap: onOpenDashboard,
+          ),
+          ListTile(
+            leading: const Icon(Icons.fact_check_outlined),
+            title: const Text('Cycle count'),
+            subtitle: const Text('Hitung fisik & penyesuaian stok'),
+            onTap: onOpenCycleCount,
           ),
           if (profile.role == UserRole.admin)
             ListTile(
