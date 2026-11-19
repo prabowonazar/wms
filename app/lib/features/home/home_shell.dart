@@ -12,6 +12,7 @@ import '../../core/cycle_count/cycle_count_remote.dart';
 import '../../core/cycle_count/cycle_count_sync.dart';
 import '../../core/master/master_sync.dart';
 import '../../core/master/product_repository.dart';
+import '../../core/sync/background_sync.dart';
 import '../../core/transactions/outbox_sync.dart';
 import '../../core/transactions/sync_summary.dart';
 import '../../core/transactions/transaction_repository.dart';
@@ -39,7 +40,8 @@ class HomeShell extends StatefulWidget {
   final UserProfile profile;
   final ScannerBuilder? scannerBuilder;
 
-  /// Berapa sering outbox otomatis dicoba saat aplikasi di depan.
+  /// Kompatibilitas API; interval kini diatur WorkManager (15 menit) di
+  /// `BackgroundSync`, bukan timer foreground.
   final Duration outboxInterval;
 
   @override
@@ -85,12 +87,12 @@ class _HomeShellState extends State<HomeShell> {
   );
 
   Timer? _timer;
-  Timer? _outboxTimer;
   StreamSubscription<OutboxSyncResult>? _subscription;
 
   @override
   void initState() {
     super.initState();
+    unawaited(BackgroundSync.initialize());
     unawaited(_outbox.flush());
     unawaited(_cycleCountSync.flushPending());
     unawaited(_loadSummary());
@@ -99,16 +101,11 @@ class _HomeShellState extends State<HomeShell> {
       const Duration(seconds: 15),
       (_) => unawaited(_loadSummary()),
     );
-    _outboxTimer = Timer.periodic(
-      widget.outboxInterval,
-      (_) => unawaited(_outbox.flush()),
-    );
   }
 
   @override
   void dispose() {
     _timer?.cancel();
-    _outboxTimer?.cancel();
     _subscription?.cancel();
     unawaited(_outbox.dispose());
     super.dispose();

@@ -23,7 +23,7 @@ import 'app_services.dart';
 /// dengan kunci baru akan menghapus outbox secara diam-diam, dan itu dilarang.
 Future<AppServices> bootstrap({Telemetry telemetry = const FirebaseTelemetry()}) async {
   if (Firebase.apps.isEmpty) {
-    await Firebase.initializeApp(options: _firebaseOptions());
+    await Firebase.initializeApp(options: firebaseOptions());
   }
 
   if (AppConfig.useEmulator) {
@@ -80,7 +80,7 @@ Future<AppServices> bootstrap({Telemetry telemetry = const FirebaseTelemetry()})
   );
 }
 
-FirebaseOptions _firebaseOptions() {
+FirebaseOptions firebaseOptions() {
   return FirebaseOptions(
     apiKey: AppConfig.apiKey,
     appId: AppConfig.appId,

@@ -35,6 +35,9 @@ dependencies:
   flutter_secure_storage: ^9.2.2
   path: ^1.9.0
 
+  # VS2-03: flush outbox & cycle-count saat app di background.
+  workmanager: ^0.5.0
+
 dev_dependencies:
   flutter_test:
     sdk: flutter
