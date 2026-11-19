@@ -21,6 +21,7 @@ const {
   validateRetryRequest,
 } = require('./lib/admin');
 const { decideApproval } = require('./lib/cycle-count');
+const { computeMetrics } = require('./lib/metrics');
 const {
   previousPeriodKey,
   buildStockCards,
@@ -1183,3 +1184,44 @@ exports.rejectCycleCount = onCall({ region: REGION }, async (request) => {
   });
   return { ok: true };
 });
+
+/** 03:00 WIB: ringkasan M1-M7 harian + alarm bila ambang dilanggar. */
+exports.dailyMetrics = onSchedule(
+  { schedule: '0 3 * * *', timeZone: 'Asia/Jakarta', region: REGION },
+  async () => {
+    const dayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
+    const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+    const [txnSnapshot, cycleSnapshot, auditSnapshot, userSnapshot] =
+      await Promise.all([
+        db.collection('transactions').where('createdAtServer', '>=', dayAgo).get(),
+        db.collection('cycleCounts').where('startedAt', '>=', weekAgo).get(),
+        db.collection('auditLogs').where('at', '>=', weekAgo).get(),
+        db.collection('users').get(),
+      ]);
+
+    const result = computeMetrics({
+      transactions: txnSnapshot.docs.map((doc) => ({ ...doc.data() })),
+      cycles: cycleSnapshot.docs.map((doc) => ({ ...doc.data() })),
+      audits: auditSnapshot.docs.map((doc) => ({ ...doc.data() })),
+      userCount: userSnapshot.size,
+    });
+    const periodKey = previousPeriodKey();
+    await db.collection('metrics').doc(periodKey).set({
+      ...result.metrics,
+      thresholds: result.thresholds,
+      alarms: result.alarms,
+      computedAt: FieldValue.serverTimestamp(),
+      schemaVersion: 1,
+    });
+    if (result.alarms.length > 0) {
+      await db.collection('auditLogs').add({
+        action: 'metrics.alarm',
+        actorUid: 'system',
+        entityType: 'metrics',
+        entityId: periodKey,
+        reason: result.alarms.join(', '),
+        at: FieldValue.serverTimestamp(),
+      });
+    }
+  },
+);

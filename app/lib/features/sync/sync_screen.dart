@@ -9,6 +9,7 @@ import '../../core/transactions/stock_transaction.dart';
 import '../../core/transactions/sync_summary.dart';
 import '../../core/transactions/transaction_remote.dart';
 import '../../core/transactions/transaction_repository.dart';
+import '../../core/ui/state_views.dart';
 import 'sync_status_badge.dart';
 
 /// SCR-20: status per transaksi + tombol sinkronisasi manual (FR-SYN-03/04).
@@ -207,7 +208,7 @@ class _SyncScreenState extends State<SyncScreen> {
         ],
       ),
       body: summary == null
-          ? const Center(child: CircularProgressIndicator())
+          ? const AppLoadingState(label: 'Memuat status sinkronisasi')
           : RefreshIndicator(
               onRefresh: _load,
               child: ListView(

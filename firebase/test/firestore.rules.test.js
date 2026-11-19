@@ -582,7 +582,62 @@ describe('konflik saldo', () => {
   });
 });
 
-describe('konfigurasi aplikasi', () => {
+describe('koleksi pendukung', () => {
+  it('operator bisa mendaftarkan perangkatnya sendiri', async () => {
+    await assertSucceeds(
+      setDoc(doc(authedDb('op1'), 'devices/dev-op1'), {
+        userId: 'op1',
+        lastSeenAt: Timestamp.now(),
+      }),
+    );
+    await assertFails(
+      setDoc(doc(authedDb('op1'), 'devices/dev-op2'), {
+        userId: 'op2',
+        lastSeenAt: Timestamp.now(),
+      }),
+    );
+    await assertFails(deleteDoc(doc(authedDb('op1'), 'devices/dev-op1')));
+  });
+
+  it('supervisor bisa membaca perangkat operator', async () => {
+    await assertSucceeds(getDoc(doc(authedDb('sv1'), 'devices/dev-op1')));
+  });
+
+  it('gudang dan saldo hanya bisa dibaca anggotanya', async () => {
+    await assertSucceeds(getDoc(doc(authedDb('op1'), 'warehouses/wh1')));
+    await assertFails(getDoc(doc(authedDb('op1'), 'warehouses/wh2')));
+    await assertFails(
+      setDoc(doc(authedDb('op1'), 'warehouses/wh1'), { name: 'Palsu' }),
+    );
+  });
+
+  it('periode dan stock card read-only untuk manusia', async () => {
+    const periodRef = 'warehouses/wh1/periods/2026-11-18';
+    await assertSucceeds(getDoc(doc(authedDb('op1'), periodRef)));
+    await assertFails(setDoc(doc(authedDb('op1'), periodRef), { status: 'closed' }));
+    const cardRef = `${periodRef}/stockCards/p1`;
+    await assertSucceeds(getDoc(doc(authedDb('op1'), cardRef)));
+    await assertFails(setDoc(doc(authedDb('op1'), cardRef), { endingQty: 99 }));
+  });
+
+  it('sheetExports hanya bisa dibaca admin', async () => {
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+      await setDoc(doc(context.firestore(), 'sheetExports/2026-11-18_1'), {
+        status: 'success',
+        rowCount: 0,
+      });
+    });
+    await assertSucceeds(
+      getDoc(doc(authedDb('adm1'), 'sheetExports/2026-11-18_1')),
+    );
+    await assertFails(
+      getDoc(doc(authedDb('sv1'), 'sheetExports/2026-11-18_1')),
+    );
+    await assertFails(
+      setDoc(doc(authedDb('adm1'), 'sheetExports/palsu'), { status: 'success' }),
+    );
+  });
+});
   it('operator hanya bisa membaca appConfig', async () => {
     await testEnv.withSecurityRulesDisabled(async (context) => {
       await setDoc(doc(context.firestore(), 'appConfig/minVersion'), {

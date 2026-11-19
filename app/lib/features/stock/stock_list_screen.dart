@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import '../../core/master/product.dart';
 import '../../core/master/product_repository.dart';
 import '../../core/transactions/transaction_remote.dart';
+import '../../core/ui/state_views.dart';
 import '../scan/product_sheet.dart';
 import 'stock_card_screen.dart';
 
@@ -69,19 +70,14 @@ class _StockListScreenState extends State<StockListScreen> {
 
     final Widget body;
     if (_error != null) {
-      body = Center(child: Text(_error!));
+      body = AppErrorState(message: _error!, onRetry: _load);
     } else if (rows == null) {
-      body = const Center(child: CircularProgressIndicator());
+      body = const AppLoadingState(label: 'Memuat daftar stok');
     } else if (rows.isEmpty) {
-      body = Center(
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Text(
-            'Belum ada produk di perangkat. Sinkronkan master dulu.',
-            style: theme.textTheme.bodyMedium,
-            textAlign: TextAlign.center,
-          ),
-        ),
+      body = const AppEmptyState(
+        title: 'Master produk belum tersinkron.',
+        message: 'Hubungi Admin atau buka Pengaturan untuk sync master.',
+        icon: Icons.inventory_2_outlined,
       );
     } else {
       body = ListView.separated(

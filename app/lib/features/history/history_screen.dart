@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 
 import '../../core/auth/auth_models.dart';
 import '../../core/observability/telemetry.dart';
+import '../../core/ui/state_views.dart';
 import '../../core/transactions/outbox_sync.dart';
 import '../../core/transactions/stock_transaction.dart';
 import '../../core/transactions/transaction_repository.dart';
@@ -196,7 +197,10 @@ class _HistoryScreenState extends State<HistoryScreen> {
             child: _rows.isEmpty
                 ? _loading
                     ? const Center(child: CircularProgressIndicator())
-                    : _emptyState(theme)
+                    : AppEmptyState(
+                        title: 'Belum ada transaksi. Mulai dari Scan.',
+                        icon: Icons.history,
+                      )
                 : ListView.builder(
                     padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
                     itemCount: _rows.length + (_hasMore ? 1 : 0),
@@ -250,26 +254,6 @@ class _HistoryScreenState extends State<HistoryScreen> {
                   ),
           ),
         ],
-      ),
-    );
-  }
-
-  Widget _emptyState(ThemeData theme) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(32),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(Icons.history, size: 56, color: theme.colorScheme.outline),
-            const SizedBox(height: 12),
-            Text(
-              'Belum ada transaksi. Mulai dari Scan.',
-              textAlign: TextAlign.center,
-              style: theme.textTheme.titleMedium,
-            ),
-          ],
-        ),
       ),
     );
   }
