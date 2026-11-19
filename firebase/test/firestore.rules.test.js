@@ -638,6 +638,8 @@ describe('koleksi pendukung', () => {
     );
   });
 });
+
+describe('konfigurasi aplikasi', () => {
   it('operator hanya bisa membaca appConfig', async () => {
     await testEnv.withSecurityRulesDisabled(async (context) => {
       await setDoc(doc(context.firestore(), 'appConfig/minVersion'), {

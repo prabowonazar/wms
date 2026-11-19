@@ -197,7 +197,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
             child: _rows.isEmpty
                 ? _loading
                     ? const Center(child: CircularProgressIndicator())
-                    : AppEmptyState(
+                    : const AppEmptyState(
                         title: 'Belum ada transaksi. Mulai dari Scan.',
                         icon: Icons.history,
                       )

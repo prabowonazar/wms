@@ -384,6 +384,21 @@ test Functions lulus.
 
 **Exit (rollout R1):** pilot 2 minggu lulus, tim ops bisa menangani insiden tanpa developer.
 
+**Status implementasi (19 Nov 2026; menunggu CI):**
+
+| Area | Kode | Bukti | Device/Ops |
+|---|---|---|---|
+| Rules suite | 46 kasus rules emulator: profil, produk/saldo, ledger, cycle-count, konflik, appConfig, devices, warehouses, periods, stockCards, sheetExports | CI | — |
+| Observability M1-M7 | `lib/metrics.js` + job `dailyMetrics` 03:00 WIB; ambang + `metrics.alarm` | 3 unit test | angka belum diukur |
+| Empty/error state | `core/ui/state_views.dart` dipakai Histori/Stok/Sinkronisasi; `Semantics` + target 48 dp | widget via CI | audit TalkBack belum |
+| Perf budget | target p95 tertulis di `docs/rollout-checklist.md`; belum ada pengukuran device | — | **belum** |
+| Backup/restore | prosedur `gcloud firestore export/import` di checklist | — | **belum dilatih** |
+| Materi pilot & seeding | langkah 100 SKU di checklist | — | **belum** |
+
+> **Keterbatasan VS-6:** CI tidak bisa membuktikan NFR perangkat, kontras AA,
+> RTO/RPO, maupun kesiapan tim. Semua item bertanda "belum" wajib diisi dari
+> project dev sebelum pilot; lihat `docs/rollout-checklist.md`.
+
 ---
 
 ## 7. Traceability Requirement → slice

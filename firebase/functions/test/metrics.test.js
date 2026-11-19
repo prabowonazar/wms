@@ -61,9 +61,9 @@ test('alarm menyala saat success rate dan lag melewati ambang', () => {
       {
         transactionId: 'slow',
         serverStatus: 'applied',
-        createdAtServer: new Date(now - 1000),
-        createdAtClient: new Date(now - 1000),
-        processedAt: new Date(now + 30 * 60000),
+        createdAtServer: new Date(now - 30 * 60000),
+        createdAtClient: new Date(now - 30 * 60000),
+        processedAt: new Date(now),
       },
       {
         transactionId: 'bad',

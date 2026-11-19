@@ -13,6 +13,7 @@ Versi dokumen: **2.0** · Tanggal: 16 November 2026 · Status: **Draft untuk rev
 | [`spike-backlog.md`](./spike-backlog.md) | 6 spike teknis (SPK-00..06), kriteria lulus biner, rencana 7 hari, Go/No-Go | Engineering, QA, Produk |
 | [`vertical-slice-backlog.md`](./vertical-slice-backlog.md) | 7 slice (VS-0..VS-6), 47 tiket, gate & metrik, traceability FR/UC → slice, rencana pilot | Engineering, QA, Produk |
 | [`runbook-vs0.md`](./runbook-vs0.md) | Cara menjalankan VS-0: toolchain, Android, Firebase, `--dart-define`, emulator, bukti AC, risiko | Engineering, QA |
+| [`rollout-checklist.md`](./rollout-checklist.md) | Target M1-M7 & NFR, prosedur device, audit aksesibilitas, backup/restore, seeding pilot | Engineering, Ops, QA |
 | [`product-import-spec.md`](./product-import-spec.md) | Template & aturan validasi import produk, semantik all-or-nothing, acceptance criteria | Admin, Ops, QA |
 
 ### Artefak siap-deploy

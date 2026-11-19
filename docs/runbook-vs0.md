@@ -43,6 +43,7 @@
 | Laporan (VS-4) | `firebase/functions/lib/period-close.js`, `sheet-export.js`, `sheets-client.js` | Closing 00:05, ekspor 02:00, rekonsiliasi 02:30 WIB |
 | Admin (VS-4) | `app/lib/core/admin/**`, `features/admin/**` | Callable user & retry paksa, layar monitoring admin |
 | Cycle count (VS-5) | `app/lib/core/cycle_count/**`, `features/cycle_count/**`, `functions/lib/cycle-count.js` | Sesi hitung fisik, variance, approval adjustment idempoten |
+| Hardening (VS-6) | `app/lib/core/ui/state_views.dart`, `functions/lib/metrics.js`, `docs/rollout-checklist.md` | Empty/error global, metrik M1-M7, checklist device & restore |
 | CI | `.github/workflows/ci.yml` | analyze/test/APK, Functions, rules emulator |
 | Verifikasi | `tools/verify-vs0.ps1` | Pemeriksaan statis + opsi `-RunTests` |
 | Verifikasi skema | `tools/verify-schema-sqlite.ps1` | Menjalankan `sqlite_schema.sql` di SQLite 3.43.2 nyata (Windows, tanpa toolchain) |
@@ -402,6 +403,8 @@ deploy tetap membutuhkan dependency.
 | `test/sheet-export.test.js` | baris applied, idempotensi, rekonsiliasi verified/partial/tampered (5 kasus) |
 | `test/admin.test.js` | izin admin, validasi perubahan user, validasi retry (3 kasus) |
 | `test/cycle-count.test.js` | variance, ringkasan sesi, rencana adjustment, approval idempoten (6 kasus) |
+| `test/metrics.test.js` | p95, M1-M7, dan alarm saat ambang dilanggar (3 kasus) |
+| Rules: koleksi pendukung | devices, warehouses, periods/stockCards, sheetExports (5 kasus) |
 
 ---
 
@@ -917,6 +920,18 @@ di-deploy; akun Supervisor/Admin tersedia.
 
 > VS5-06 (tab konflik di layar persetujuan) belum dibuat terpisah; daftar
 > konflik Supervisor tetap tersedia di SCR-20.
+
+---
+
+## 19. Rollout & bukti yang tidak bisa dari CI (VS-6)
+
+Buka [`rollout-checklist.md`](rollout-checklist.md) untuk target NFR/M1-M7,
+prosedur pengukuran device, audit aksesibilitas, latihan backup/restore, seeding
+100 SKU, dan daftar utang (WorkManager, tab konflik, PDF/CSV, M5 otomatis).
+
+Ringkasnya: CI membuktikan kompilasi, 46 kasus rules, dan seluruh unit/widget
+test. CI **tidak** membuktikan angka performa, kontras AA, RTO/RPO, maupun
+kesiapan tim — semuanya wajib diisi dari project dev sebelum pilot.
 
 
 
