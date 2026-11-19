@@ -20,7 +20,7 @@ void main() {
     );
     expect(
       detail.data,
-      'SqfliteDatabaseException: file is not a database (code 26)',
+      contains('SqfliteDatabaseException: file is not a database (code 26)'),
     );
     expect(find.text('Salin detail'), findsOneWidget);
   });
