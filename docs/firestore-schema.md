@@ -434,6 +434,23 @@ runTransaction:
 Selama VS-2 Function **tidak** menulis `stockCards`; agregasi periode dan
 closing harian masuk VS-4.
 
+**VS-3 — reversal (BR-06):** sebelum memutuskan, trigger membaca konteks di
+dalam transaksi Firestore yang sama dengan penulisan saldo:
+
+```
+ref = transactions/{refTransactionId}
+originalStatus     = ref.serverStatus            // harus 'applied'
+previousReversal   = query transactions where refTransactionId == ref
+                       and type == 'reversal' and serverStatus == 'applied'
+                       limit 1                  // harus kosong
+originalSignedQty  = ref.signedQty               // reversal = -originalSignedQty
+
+reject: original_not_applied | already_reversed | reversal_qty_mismatch
+```
+
+Index gabungan `(refTransactionId, type, serverStatus)` ada di
+`firebase/firestore.indexes.json`. Transaksi asli tidak pernah diubah/dihapus.
+
 **Batas penting:** Firestore membatasi **1 write/detik per dokumen**. Untuk SKU "panas" yang di-scan beberapa device bersamaan, Function bisa gagal karena contention. Mitigasi:
 - retry otomatis (idempotent karena `lastTransactionId`),
 - jika sustained > 1 write/detik pada satu produk, pecah ke **sub-counter** (`balances/{productId}/shards/{n}`) dan jumlahkan saat baca/closing.

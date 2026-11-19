@@ -162,3 +162,80 @@ test('saldo belum ada dianggap 0', () => {
   assert.equal(outgoing.action, 'reject');
   assert.equal(outgoing.reason, 'negative_stock');
 });
+
+function reversalTxn(signedQty) {
+  return txn({
+    type: 'reversal',
+    qty: signedQty,
+    signedQty,
+    refTransactionId: 'tx-original',
+  });
+}
+
+test('reversal sah mengembalikan saldo ke nilai sebelum transaksi asli', () => {
+  const result = decideApply({
+    transaction: reversalTxn(-5),
+    balance: { endingQty: 5 },
+    actorRole: 'supervisor',
+    transactionId: 'tx-rev',
+    reversal: {
+      originalStatus: 'applied',
+      alreadyReversed: false,
+      originalSignedQty: 5,
+    },
+  });
+
+  assert.equal(result.action, 'apply');
+  assert.equal(result.endingQty, 0);
+});
+
+test('reversal ditolak bila transaksi asli belum diterapkan', () => {
+  const result = decideApply({
+    transaction: reversalTxn(-5),
+    balance: { endingQty: 5 },
+    actorRole: 'supervisor',
+    transactionId: 'tx-rev',
+    reversal: {
+      originalStatus: 'pending',
+      alreadyReversed: false,
+      originalSignedQty: 5,
+    },
+  });
+
+  assert.equal(result.action, 'reject');
+  assert.equal(result.reason, 'original_not_applied');
+});
+
+test('reversal kedua ditolak walaupun datang dari device berbeda', () => {
+  const result = decideApply({
+    transaction: reversalTxn(-5),
+    balance: { endingQty: 0 },
+    actorRole: 'supervisor',
+    transactionId: 'tx-rev-2',
+    reversal: {
+      originalStatus: 'applied',
+      alreadyReversed: true,
+      originalSignedQty: 5,
+    },
+  });
+
+  assert.equal(result.action, 'reject');
+  assert.equal(result.reason, 'already_reversed');
+});
+
+test('reversal dengan jumlah bukan kebalikan ditolak', () => {
+  const result = decideApply({
+    transaction: reversalTxn(-4),
+    balance: { endingQty: 5 },
+    actorRole: 'supervisor',
+    transactionId: 'tx-rev',
+    reversal: {
+      originalStatus: 'applied',
+      alreadyReversed: false,
+      originalSignedQty: 5,
+    },
+  });
+
+  assert.equal(result.action, 'reject');
+  assert.equal(result.reason, 'reversal_qty_mismatch');
+});

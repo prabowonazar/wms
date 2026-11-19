@@ -37,6 +37,9 @@
 | Scan (VS-1) | `app/lib/features/scan/**`, `features/home/settings_sheet.dart` | SCR-03/06/07, debounce 800 ms, banner master, pengaturan |
 | Ledger (VS-2) | `app/lib/core/transactions/**` | UUIDv7, repository SQLite atomik, remote create-only, outbox |
 | Transaksi (VS-2) | `app/lib/features/movement/**`, `features/stock/**` | SCR-04/08/09/12/13: masuk/keluar, override, saldo & stock card |
+| Sync (VS-3) | `app/lib/features/sync/**`, `core/transactions/sync_policy.dart` | SCR-20: status per transaksi, backoff 5×, sync manual, tarik penolakan server |
+| Histori (VS-3) | `app/lib/features/history/**` | SCR-10/11: filter, pagination, detail, reversal supervisor |
+| Beranda (VS-3) | `app/lib/features/home/home_shell.dart` | Navigasi Scan/Histori/Stok/Lainnya + chip status sync |
 | CI | `.github/workflows/ci.yml` | analyze/test/APK, Functions, rules emulator |
 | Verifikasi | `tools/verify-vs0.ps1` | Pemeriksaan statis + opsi `-RunTests` |
 | Verifikasi skema | `tools/verify-schema-sqlite.ps1` | Menjalankan `sqlite_schema.sql` di SQLite 3.43.2 nyata (Windows, tanpa toolchain) |
@@ -310,6 +313,9 @@ Yang harus hijau:
 | `test/transaction_repository_test.dart` | Ledger lokal: tanda, saldo, override, idempoten, immutability, stock card, outbox |
 | `test/outbox_sync_test.dart` | Flush 300 transaksi, replay, jaringan mati, lanjut setelah pulih |
 | `test/movement_flow_test.dart` | Widget SCR-04/08/09: keluar, stok tidak cukup, override supervisor, alasan <10 karakter ditolak, qty 0 |
+| `test/auth_session_test.dart` | Batas sesi offline 7 hari, cache `fetched_at`, backoff & pesan error |
+| `test/outbox_sync_test.dart` | VS-3: retry habis di 5, retry manual, penolakan server, `syncNow` menarik status |
+| Functions `test/apply-balance.test.js` | VS-3: reversal sah, asli belum `applied`, reversal ganda, qty bukan kebalikan |
 
 Catatan Windows: `sqflite_common_ffi` membutuhkan `sqlite3.dll` yang kompatibel.
 Bila test FFI gagal dengan pesan "sqlite3.dll not found", jalankan di CI (Ubuntu)
@@ -366,7 +372,7 @@ node --test test/
 
 CI tidak menjalankan `npm install` untuk Functions karena hanya menguji logika murni;
 deploy tetap membutuhkan dependency. `test/apply-balance.test.js` menguji keputusan
-saldo/override/replay tanpa emulator (10 kasus).
+saldo/override/replay/reversal tanpa emulator (14 kasus).
 
 ---
 
@@ -658,8 +664,7 @@ firebase deploy --only firestore:rules,functions
    `approvedBy` terisi, dan `auditLogs` memuat alasan override.
 4. Ulangi dengan user supervisor yang `users/{uid}.role` diubah menjadi
    `operator` sebelum sync → server menolak (`serverStatus='rejected'`).
-   Ini juga menunjukkan keterbatasan VS-2: device belum menarik status tolak
-   tersebut (baru di VS-3).
+   Gunakan alur VS-3 §16.1 untuk melihat penolakan itu di layar Sinkronisasi.
 
 ### 15.4 Beban 300 transaksi (target G2)
 
@@ -680,5 +685,68 @@ firebase deploy --only firestore:rules,functions
 | `outbox_sync_failed` | DebugView + Crashlytics non-fatal `outbox_sync_failed` |
 | Waktu simpan ≤1,5 s | stopwatch manual 10×, ambil p95 |
 | Exactly-once | jumlah dokumen Firestore vs baris SQLite |
+
+---
+
+## 16. Demo VS-3 (status, pemulihan, histori, pembatalan)
+
+Prasyarat: §15 sudah jalan dan indeks gabungan `transactions`
+(`refTransactionId`, `type`, `serverStatus`) sudah di-deploy bersama rules/functions.
+
+### 16.1 Chip, gagal, dan sync manual (VS3-01/02/03)
+
+1. Aktifkan airplane mode, buat 3 transaksi. Chip di bawah navigasi harus
+   terbaca "3 belum terkirim"; warna saja tidak boleh jadi satu-satunya petunjuk.
+2. Biarkan app terbuka >2 menit agar retry otomatis jalan. Karena tidak ada
+   jaringan, jumlah percobaan naik dan alasan berubah menjadi "Tidak ada koneksi…".
+3. Buka **Lainnya → Sinkronisasi**: kartu ringkasan, daftar "Perlu tindakan",
+   dan tombol **SYNC SEKARANG** harus tampil. Tap tombol: indikator berubah
+   "Mengirim x/y" dan tombol nonaktif saat proses (tidak bisa dobel-trigger).
+4. Matikan airplane mode, tap **Coba lagi** pada item → status `synced`, chip
+   kembali "Semua terkirim".
+5. Uji batas: dengan remote yang gagal terus, enam putaran sync membuat
+   `retry_count=5`, `next_retry_at=NULL`, dan pesan "Perlu bantuan admin";
+   putaran berikutnya tidak memanggil jaringan lagi. Tombol **Batalkan**
+   menghapus baris yang belum diterima server.
+6. Penolakan server (mis. role supervisor diturunkan sebelum sync): setelah
+   **Sync sekarang**, transaksi berstatus "Ditolak server" dengan alasan
+   `Server menolak: …`, bukan lagi `synced`.
+
+### 16.2 Histori & reversal (VS3-05/06)
+
+1. Buka tab **Histori**: hasil default 7 hari, filter jenis/kode bekerja,
+   pagination 50 baris. Sebagai operator, hanya transaksi sendiri yang tampil;
+   supervisor melihat seluruh gudang.
+2. Supervisor membuka detail transaksi yang sudah `Terkirim` → **Batalkan
+   transaksi** → alasan <10 karakter membuat tombol nonaktif.
+3. Setelah diisi → transaksi `reversal` baru muncul, saldo kembali ke nilai
+   sebelum transaksi asli, transaksi asli tetap ada dan ditandai "sudah
+   dibatalkan".
+4. Coba membatalkan ulang dari device lain → server menolak
+   (`serverStatus='rejected'`, `rejectedReason='already_reversed'`);
+   `auditLogs` memuat aksi `transaction.rejected`.
+
+### 16.3 Sesi offline 7 hari (VS3-07)
+
+1. Login online, lalu matikan jaringan. Hari ke-7 aplikasi masih bisa scan.
+2. Ubah jam perangkat ke hari ke-8 (atau mundurkan `fetched_at` di DB debug)
+   lalu buka app → layar login menampilkan "Sesi berakhir setelah offline lebih
+   dari 7 hari".
+3. Login ulang dengan akun yang sama → transaksi `pending` tetap ada dan
+   terkirim setelah jaringan pulih.
+
+### 16.4 Bukti yang perlu dicatat
+
+| Bukti | Cara |
+|---|---|
+| Status 4 kondisi | screenshot chip + baris histori (abu/biru/hijau/merah) |
+| Progres nyata | screenshot "Mengirim x/y" saat 300 transaksi |
+| Backoff 5× | `retry_count` dan `next_retry_at` di DB debug |
+| Penolakan | `serverStatus` Firestore vs teks di SCR-20 |
+| Reversal ganda | jumlah dokumen reversal = 1 dan `auditLogs` |
+| Sesi 8 hari | pesan di SCR-01 + jumlah baris `pending` sebelum/sesudah login ulang |
+
+> VS3-04 (konflik saldo) belum punya demo karena belum diimplementasikan;
+> lihat keterbatasan di `docs/vertical-slice-backlog.md` (VS-3).
 
 

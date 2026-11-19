@@ -50,10 +50,18 @@ function readBalanceQty(balance) {
  * @param {object|null} args.balance dokumen saldo saat ini (belum ada = null).
  * @param {string|null} args.actorRole role pengguna dari `users/{uid}`.
  * @param {string} args.transactionId document ID (= idempotency key).
+ * @param {object|null} [args.reversal] konteks reversal dari server:
+ *   `{ originalStatus, alreadyReversed, originalSignedQty }`.
  * @returns {{action: 'apply'|'reject'|'skip', reason: string,
  *   endingQty?: number, override?: boolean}}
  */
-function decideApply({ transaction, balance, actorRole, transactionId }) {
+function decideApply({
+  transaction,
+  balance,
+  actorRole,
+  transactionId,
+  reversal,
+}) {
   if (!transaction || typeof transaction !== 'object') {
     return { action: 'reject', reason: 'missing_transaction' };
   }
@@ -71,6 +79,22 @@ function decideApply({ transaction, balance, actorRole, transactionId }) {
   if (!Number.isInteger(transaction.signedQty) ||
       transaction.signedQty !== expected) {
     return { action: 'reject', reason: 'signed_mismatch' };
+  }
+
+  // BR-06: reversal hanya boleh untuk transaksi yang sudah diterapkan,
+  // belum pernah dibatalkan, dan jumlahnya tepat kebalikan. Pemeriksaan ini
+  // di server karena dua device bisa mengirim reversal berbeda bersamaan.
+  if (transaction.type === 'reversal') {
+    if (!reversal || reversal.originalStatus !== 'applied') {
+      return { action: 'reject', reason: 'original_not_applied' };
+    }
+    if (reversal.alreadyReversed) {
+      return { action: 'reject', reason: 'already_reversed' };
+    }
+    if (Number.isInteger(reversal.originalSignedQty) &&
+        transaction.signedQty !== -reversal.originalSignedQty) {
+      return { action: 'reject', reason: 'reversal_qty_mismatch' };
+    }
   }
 
   const current = readBalanceQty(balance);

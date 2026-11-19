@@ -196,11 +196,40 @@ exports.applyBalance = onDocumentCreated(
       const balanceSnapshot = await txn.get(balanceRef);
       const balance = balanceSnapshot.exists ? balanceSnapshot.data() : null;
 
+      // BR-06: reversal tidak pernah mengubah transaksi asli. Konteksnya
+      // dibaca di dalam transaksi yang sama dengan penulisan saldo, sehingga
+      // dua reversal bersamaan tidak bisa lolos keduanya.
+      let reversalContext = null;
+      if (data.type === 'reversal' &&
+          typeof data.refTransactionId === 'string') {
+        const originalRef = db.doc(`transactions/${data.refTransactionId}`);
+        const [originalSnap, previousSnap] = await Promise.all([
+          txn.get(originalRef),
+          txn.get(
+            db.collection('transactions')
+              .where('refTransactionId', '==', data.refTransactionId)
+              .where('type', '==', 'reversal')
+              .where('serverStatus', '==', 'applied')
+              .limit(1),
+          ),
+        ]);
+        reversalContext = {
+          originalStatus: originalSnap.exists
+            ? originalSnap.get('serverStatus')
+            : null,
+          alreadyReversed: !previousSnap.empty,
+          originalSignedQty: originalSnap.exists
+            ? originalSnap.get('signedQty')
+            : null,
+        };
+      }
+
       const decision = decideApply({
         transaction: data,
         balance,
         actorRole,
         transactionId: snapshot.id,
+        reversal: reversalContext,
       });
       if (decision.action === 'skip') {
         return;
