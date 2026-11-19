@@ -1,5 +1,3 @@
-import 'package:warehouse_mobile/core/auth/auth_models.dart';
-
 /// Status sesi cycle-count. Urutan mengikuti mesin status UC-STK-02..05.
 enum CycleCountStatus {
   open('open'),

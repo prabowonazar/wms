@@ -171,7 +171,7 @@ class _HomeShellState extends State<HomeShell> {
           repository: _cycleCounts,
           sync: _cycleCountSync,
           products: _products,
-          remote: const FirestoreCycleCountRemote(FirebaseFirestore.instance),
+          remote: FirestoreCycleCountRemote(FirebaseFirestore.instance),
           profile: widget.profile,
         ),
       ),
