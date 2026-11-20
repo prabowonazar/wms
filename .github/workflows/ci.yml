@@ -151,7 +151,9 @@ jobs:
           CLIENT_ID="${GOOGLE_SERVER_CLIENT_ID:-demo.apps.googleusercontent.com}"
           STORAGE_BUCKET="${FB_STORAGE_BUCKET:-}"
 
-          echo "BUILD_CONFIG project=$PROJECT_ID oauth=$([ -n "$CLIENT_ID" ] && echo set || echo empty)"
+          # Awalan Client ID bukan rahasia (ikut tertanam di APK) dan dipakai
+          # untuk memastikan yang dipakai benar-benar client bertipe Web.
+          echo "BUILD_CONFIG project=$PROJECT_ID oauth=$([ -n "$CLIENT_ID" ] && echo set || echo empty) client_head=${CLIENT_ID:0:19} len=${#CLIENT_ID}"
 
           flutter build apk --debug \
             --dart-define=FB_PROJECT_ID="$PROJECT_ID" \
