@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:google_sign_in/google_sign_in.dart';
 
 import '../observability/telemetry.dart';
 import '../storage/profile_cache.dart';
@@ -95,6 +96,19 @@ class AuthRepository {
     } on SignInCancelled {
       await _telemetry.logEvent(TelemetryEvents.loginCancelled);
       rethrow;
+    } on GoogleSignInException catch (error) {
+      // Google Sign-In gagal sebelum Firebase dipanggil (SHA-1, Web client ID,
+      // Play Services, atau akun dibatalkan). Tampilkan kodenya ke teknisi.
+      final code = error.code.name;
+      await _telemetry.logEvent(
+        TelemetryEvents.loginFailed,
+        parameters: {'stage': 'google', 'code': code},
+      );
+      throw AuthException(
+        'google_$code',
+        'Google Sign-In gagal ($code). Periksa SHA-1, package name, dan '
+        'Web client ID di Firebase.',
+      );
     } on AuthException {
       rethrow;
     } on FirebaseAuthException catch (error) {

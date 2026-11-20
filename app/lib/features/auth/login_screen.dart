@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart' show kDebugMode;
 import 'package:flutter/material.dart';
 
 import '../../core/config/app_config.dart';
@@ -51,7 +52,9 @@ class _LoginScreenState extends State<LoginScreen> {
       );
       if (mounted) {
         setState(
-          () => _error = 'Login gagal. Periksa jaringan lalu coba lagi.',
+          () => _error = kDebugMode
+              ? 'Login gagal: $error'
+              : 'Login gagal. Periksa jaringan lalu coba lagi.',
         );
       }
     } finally {
@@ -175,6 +178,17 @@ class _LoginScreenState extends State<LoginScreen> {
                     style: theme.textTheme.bodySmall,
                   ),
                   const SizedBox(height: 32),
+                  if (kDebugMode)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 16),
+                      child: Text(
+                        'Debug · project: ${AppConfig.projectId} · '
+                        'oauth: ${AppConfig.googleServerClientId.isEmpty ? 'kosong' : 'terisi'} · '
+                        'demo: ${AppConfig.demoMode}',
+                        textAlign: TextAlign.center,
+                        style: theme.textTheme.labelSmall,
+                      ),
+                    ),
                   Text(
                     'Versi ${AppConfig.appVersion}',
                     textAlign: TextAlign.center,
