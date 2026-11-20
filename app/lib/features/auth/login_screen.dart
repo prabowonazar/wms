@@ -231,7 +231,7 @@ class _LoginScreenState extends State<LoginScreen> {
 /// Awalan Client ID OAuth untuk memastikan nilainya berasal dari project
 /// Firebase yang sama (prefix = nomor project, mis. `2232431696-...`).
 String _oauthHint() {
-  final clientId = AppConfig.googleServerClientId;
+  const clientId = AppConfig.googleServerClientId;
   if (clientId.isEmpty) {
     return 'kosong';
   }
