@@ -38,7 +38,7 @@ class _LoginScreenState extends State<LoginScreen> {
     try {
       await widget.auth.signInWithGoogle();
       // AuthGate akan berpindah layar lewat stream authStateChanges.
-    } on SignInCancelled {
+    } on SignInCancelled catch (error) {
       // Jangan diam: pengguna perlu tahu bahwa akun tidak dikembalikan Google.
       if (mounted) {
         setState(
