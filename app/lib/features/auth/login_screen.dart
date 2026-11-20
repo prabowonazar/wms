@@ -44,7 +44,7 @@ class _LoginScreenState extends State<LoginScreen> {
         setState(
           () => _error = kDebugMode
               ? 'Google Sign-In dibatalkan / akun tidak dikembalikan. '
-                  'Cek SHA-1, package name, dan Test user di OAuth consent screen.'
+                  'Detail: ${error.detail ?? 'tidak ada'}'
               : 'Login Google dibatalkan. Coba lagi.',
         );
       }
