@@ -163,6 +163,15 @@ jobs:
             --dart-define=GOOGLE_SERVER_CLIENT_ID="$CLIENT_ID" \
             --dart-define=FB_STORAGE_BUCKET="$STORAGE_BUCKET"
 
+      - name: Verifikasi package & sertifikat APK
+        run: |
+          APK=app/build/app/outputs/flutter-apk/app-debug.apk
+          BUILD_TOOLS=$(ls -d "$ANDROID_HOME"/build-tools/* | sort -V | tail -1)
+          echo "=== Paket APK (harus wms.fasco) ==="
+          "$BUILD_TOOLS/aapt2" dump badging "$APK" | head -1
+          echo "=== Sertifikat penanda tangan APK ==="
+          "$BUILD_TOOLS/apksigner" verify --print-certs "$APK" | grep -i 'SHA-1'
+
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
