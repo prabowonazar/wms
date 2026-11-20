@@ -39,7 +39,15 @@ class _LoginScreenState extends State<LoginScreen> {
       await widget.auth.signInWithGoogle();
       // AuthGate akan berpindah layar lewat stream authStateChanges.
     } on SignInCancelled {
-      // Pengguna menutup dialog Google: bukan error.
+      // Jangan diam: pengguna perlu tahu bahwa akun tidak dikembalikan Google.
+      if (mounted) {
+        setState(
+          () => _error = kDebugMode
+              ? 'Google Sign-In dibatalkan / akun tidak dikembalikan. '
+                  'Cek SHA-1, package name, dan Test user di OAuth consent screen.'
+              : 'Login Google dibatalkan. Coba lagi.',
+        );
+      }
     } on AuthException catch (error) {
       if (mounted) {
         setState(() => _error = error.message);
