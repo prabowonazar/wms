@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart' show kDebugMode;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -27,8 +29,65 @@ class LoginScreen extends StatefulWidget {
 }
 
 class _LoginScreenState extends State<LoginScreen> {
+  final TextEditingController _email = TextEditingController();
+  final TextEditingController _password = TextEditingController();
+  bool _obscure = true;
   bool _busy = false;
   String? _error;
+
+  @override
+  void dispose() {
+    _email.dispose();
+    _password.dispose();
+    super.dispose();
+  }
+
+  Future<void> _signInWithEmail() async {
+    final email = _email.text.trim();
+    final password = _password.text;
+    if (email.isEmpty || password.isEmpty) {
+      setState(() => _error = 'Isi email dan kata sandi terlebih dahulu.');
+      return;
+    }
+    if (!email.contains('@')) {
+      setState(() => _error = 'Format email tidak valid.');
+      return;
+    }
+
+    setState(() {
+      _busy = true;
+      _error = null;
+    });
+
+    try {
+      await widget.auth.signInWithEmailPassword(
+        email: email,
+        password: password,
+      );
+      // AuthGate akan berpindah layar lewat stream authStateChanges.
+    } on AuthException catch (error) {
+      if (mounted) {
+        setState(() => _error = error.message);
+      }
+    } catch (error, stackTrace) {
+      await widget.telemetry.recordError(
+        error,
+        stackTrace,
+        reason: 'login_password_unexpected',
+      );
+      if (mounted) {
+        setState(
+          () => _error = kDebugMode
+              ? 'Login gagal: $error'
+              : 'Login gagal. Periksa jaringan lalu coba lagi.',
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _busy = false);
+      }
+    }
+  }
 
   Future<void> _signIn() async {
     setState(() {
@@ -135,8 +194,48 @@ class _LoginScreenState extends State<LoginScreen> {
                     ),
                     const SizedBox(height: 16),
                   ],
+                  TextField(
+                    controller: _email,
+                    enabled: !_busy,
+                    keyboardType: TextInputType.emailAddress,
+                    autocorrect: false,
+                    textInputAction: TextInputAction.next,
+                    decoration: const InputDecoration(
+                      labelText: 'Email',
+                      hintText: 'nama@perusahaan.com',
+                      prefixIcon: Icon(Icons.alternate_email),
+                      border: OutlineInputBorder(),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: _password,
+                    enabled: !_busy,
+                    obscureText: _obscure,
+                    textInputAction: TextInputAction.done,
+                    onSubmitted: (_) {
+                      if (!_busy) {
+                        unawaited(_signInWithEmail());
+                      }
+                    },
+                    decoration: InputDecoration(
+                      labelText: 'Kata sandi',
+                      prefixIcon: const Icon(Icons.lock_outline),
+                      border: const OutlineInputBorder(),
+                      suffixIcon: IconButton(
+                        tooltip: _obscure ? 'Tampilkan' : 'Sembunyikan',
+                        icon: Icon(
+                          _obscure
+                              ? Icons.visibility_outlined
+                              : Icons.visibility_off_outlined,
+                        ),
+                        onPressed: () => setState(() => _obscure = !_obscure),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
                   FilledButton.icon(
-                    onPressed: _busy ? null : _signIn,
+                    onPressed: _busy ? null : _signInWithEmail,
                     icon: _busy
                         ? const SizedBox(
                             width: 18,
@@ -144,10 +243,28 @@ class _LoginScreenState extends State<LoginScreen> {
                             child: CircularProgressIndicator(strokeWidth: 2),
                           )
                         : const Icon(Icons.login),
-                    label: Text(
-                      _busy ? 'Menghubungkan...' : 'Masuk dengan Google',
-                    ),
+                    label: Text(_busy ? 'Menghubungkan...' : 'Masuk'),
                     style: FilledButton.styleFrom(
+                      minimumSize: const Size.fromHeight(52),
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+                  Row(
+                    children: [
+                      const Expanded(child: Divider()),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 12),
+                        child: Text('atau', style: theme.textTheme.labelMedium),
+                      ),
+                      const Expanded(child: Divider()),
+                    ],
+                  ),
+                  const SizedBox(height: 24),
+                  OutlinedButton.icon(
+                    onPressed: _busy ? null : _signIn,
+                    icon: const Icon(Icons.account_circle_outlined),
+                    label: const Text('Masuk dengan Google'),
+                    style: OutlinedButton.styleFrom(
                       minimumSize: const Size.fromHeight(52),
                     ),
                   ),
@@ -196,8 +313,9 @@ class _LoginScreenState extends State<LoginScreen> {
                   ],
                   const SizedBox(height: 24),
                   Text(
-                    'Gunakan akun Google yang sudah didaftarkan Admin. '
-                    'Belum punya akses? Hubungi Admin gudang.',
+                    'Gunakan email & kata sandi yang didaftarkan Admin, atau '
+                    'akun Google yang sudah terdaftar. Belum punya akses? '
+                    'Hubungi Admin gudang.',
                     textAlign: TextAlign.center,
                     style: theme.textTheme.bodySmall,
                   ),

@@ -61,6 +61,18 @@ void main() {
     ), isFalse);
   });
 
+  test('pesan login email/kata sandi ramah pengguna', () {
+    expect(describeAuthError('invalid-credential'), 'Email atau kata sandi salah.');
+    expect(describeAuthError('user-not-found'), contains('salah'));
+    expect(describeAuthError('wrong-password'), contains('salah'));
+    expect(
+      describeAuthError('operation-not-allowed'),
+      contains('belum diaktifkan'),
+    );
+    expect(describeAuthError('too-many-requests'), contains('Terlalu banyak'));
+    expect(describeAuthError('invalid-email'), contains('tidak valid'));
+  });
+
   test('retry policy berhenti setelah batas dan memakai backoff', () {
     expect(retryDelayFor(1), const Duration(seconds: 30));
     expect(retryDelayFor(2), const Duration(seconds: 60));

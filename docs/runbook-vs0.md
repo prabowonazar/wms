@@ -189,6 +189,23 @@ firebase deploy --only firestore:rules,firestore:indexes
 
 ### 4.1 Mendaftarkan pengguna (wajib sebelum demo)
 
+Ada dua cara login: **email + kata sandi** (paling cepat, tanpa konfigurasi OAuth)
+dan **Google**. Keduanya memakai aturan profil yang sama di bawah.
+
+#### 4.1.a Login email + kata sandi (disarankan untuk uji cepat)
+
+1. Firebase Console -> Authentication -> **Sign-in method** -> aktifkan
+   **Email/Password** (satu kali).
+2. Tab **Users** -> **Add user** -> isi email + kata sandi. Salin **UID**.
+3. Buat dokumen `users/{uid}` seperti contoh di bawah.
+4. Di aplikasi, isi email + kata sandi pada layar login, tekan **Masuk**.
+
+Tidak perlu SHA-1, OAuth client, maupun `GOOGLE_SERVER_CLIENT_ID` untuk cara ini.
+Bila muncul "Metode login ini belum diaktifkan di Firebase", berarti langkah 1
+belum dilakukan.
+
+#### 4.1.b Login Google
+
 Aplikasi **tidak** membuat profil sendiri; Admin yang membuat (FR-AUTH-04). Urutan:
 
 1. Jalankan app, login dengan akun Google operator.

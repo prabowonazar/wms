@@ -71,6 +71,48 @@ class AuthRepository {
 
   Future<void> initializeGoogleSignIn() => _googleSignIn.initialize();
 
+  /// Login email + kata sandi untuk akun yang dibuat manual di
+  /// Firebase Console (Authentication > Users). Tidak memerlukan SHA-1 atau
+  /// OAuth client, jadi berguna saat Google Sign-In belum bisa dipakai.
+  Future<void> signInWithEmailPassword({
+    required String email,
+    required String password,
+  }) async {
+    _sessionMessage = null;
+    try {
+      final result = await _auth.signInWithEmailAndPassword(
+        email: email.trim(),
+        password: password,
+      );
+      final user = result.user;
+      if (user == null) {
+        throw const AuthException(
+          'sign_in_failed',
+          'Login gagal: sesi Firebase tidak terbentuk.',
+        );
+      }
+      await _telemetry.setUser(user.uid);
+      await _telemetry.logEvent(TelemetryEvents.loginSuccess);
+    } on AuthException {
+      rethrow;
+    } on FirebaseAuthException catch (error) {
+      await _telemetry.logEvent(
+        TelemetryEvents.loginFailed,
+        parameters: {'stage': 'password', 'code': error.code},
+      );
+      throw AuthException(error.code, describeAuthError(error.code));
+    } catch (_) {
+      await _telemetry.logEvent(
+        TelemetryEvents.loginFailed,
+        parameters: {'stage': 'password'},
+      );
+      throw const AuthException(
+        'sign_in_failed',
+        'Login gagal. Periksa jaringan lalu coba lagi.',
+      );
+    }
+  }
+
   Future<void> signInWithGoogle() async {
     _sessionMessage = null;
     try {
@@ -269,18 +311,34 @@ class AuthRepository {
     }
   }
 
-  static String _messageFor(FirebaseAuthException error) {
-    switch (error.code) {
-      case 'network-request-failed':
-        return 'Tidak ada koneksi. Periksa jaringan lalu coba lagi.';
-      case 'user-disabled':
-        return 'Akun ini dinonaktifkan di Firebase Auth.';
-      case 'operation-not-allowed':
-        return 'Metode login Google belum diaktifkan di Firebase.';
-      case 'account-exists-with-different-credential':
-        return 'Email ini sudah terdaftar dengan metode login lain.';
-      default:
-        return 'Login gagal (${error.code}). Coba lagi atau hubungi Admin.';
-    }
+  static String _messageFor(FirebaseAuthException error) =>
+      describeAuthError(error.code);
+}
+
+/// Pesan ramah pengguna untuk kode error Firebase Auth.
+///
+/// Dipisah dari repository agar bisa diuji tanpa Firebase.
+String describeAuthError(String code) {
+  switch (code) {
+    case 'network-request-failed':
+      return 'Tidak ada koneksi. Periksa jaringan lalu coba lagi.';
+    case 'user-disabled':
+      return 'Akun ini dinonaktifkan di Firebase Auth.';
+    case 'operation-not-allowed':
+      return 'Metode login ini belum diaktifkan di Firebase.';
+    case 'account-exists-with-different-credential':
+      return 'Email ini sudah terdaftar dengan metode login lain.';
+    case 'invalid-email':
+      return 'Format email tidak valid.';
+    case 'user-not-found':
+    case 'wrong-password':
+    case 'invalid-credential':
+      return 'Email atau kata sandi salah.';
+    case 'missing-password':
+      return 'Kata sandi belum diisi.';
+    case 'too-many-requests':
+      return 'Terlalu banyak percobaan. Tunggu beberapa saat lalu coba lagi.';
+    default:
+      return 'Login gagal ($code). Coba lagi atau hubungi Admin.';
   }
 }
