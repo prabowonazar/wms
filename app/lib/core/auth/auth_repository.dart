@@ -69,6 +69,8 @@ class AuthRepository {
   /// saat widget baru berlangganan.
   AuthState get currentState => _currentState;
 
+  Future<void> initializeGoogleSignIn() => _googleSignIn.initialize();
+
   Future<void> signInWithGoogle() async {
     _sessionMessage = null;
     try {

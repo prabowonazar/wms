@@ -45,6 +45,18 @@ Future<void> main() async {
 
   try {
     final services = await bootstrap(telemetry: telemetry);
+    if (!AppConfig.demoMode) {
+      try {
+        await services.auth.initializeGoogleSignIn();
+      } catch (error, stackTrace) {
+        await telemetry.recordError(
+          error,
+          stackTrace,
+          reason: 'google_sign_in_init_failed',
+        );
+      }
+    }
+
     if (AppConfig.demoMode) {
       await seedDemoData(services.database);
       runApp(

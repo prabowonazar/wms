@@ -24,6 +24,11 @@ class GoogleSignInAdapter {
   final GoogleSignIn _googleSignIn;
   bool _initialized = false;
 
+  /// Dipanggil sekali saat startup agar `authenticate()` bisa langsung
+  /// diluncurkan dari gesture tap tanpa async gap (Android membatalkan
+  /// activity bila gesture sudah hilang).
+  Future<void> initialize() => _ensureInitialized();
+
   Future<void> _ensureInitialized() async {
     if (_initialized) {
       return;
@@ -37,7 +42,11 @@ class GoogleSignInAdapter {
 
   /// Mengembalikan ID token, atau `null` bila token kosong.
   Future<String?> idToken() async {
-    await _ensureInitialized();
+    // Hindari await bila sudah diinisialisasi di startup: authenticate()
+    // harus dipanggil langsung dari user gesture di Android.
+    if (!_initialized) {
+      await _ensureInitialized();
+    }
     if (!_googleSignIn.supportsAuthenticate()) {
       throw StateError(
         'Google Sign-In interaktif tidak didukung di platform ini.',
