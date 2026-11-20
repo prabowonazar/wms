@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart' show kDebugMode;
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../../core/config/app_config.dart';
 import '../../core/observability/telemetry.dart';
@@ -174,6 +175,21 @@ class _LoginScreenState extends State<LoginScreen> {
                               ),
                             ),
                           ),
+                          IconButton(
+                            tooltip: 'Salin pesan error',
+                            icon: const Icon(Icons.copy_all_outlined, size: 20),
+                            color: theme.colorScheme.onErrorContainer,
+                            onPressed: () {
+                              Clipboard.setData(
+                                ClipboardData(text: _error!),
+                              );
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                const SnackBar(
+                                  content: Text('Pesan error disalin.'),
+                                ),
+                              );
+                            },
+                          ),
                         ],
                       ),
                     ),
@@ -191,7 +207,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       padding: const EdgeInsets.only(bottom: 16),
                       child: Text(
                         'Debug · project: ${AppConfig.projectId} · '
-                        'oauth: ${AppConfig.googleServerClientId.isEmpty ? 'kosong' : 'terisi'} · '
+                        'oauth: ${_oauthHint()} · '
                         'demo: ${AppConfig.demoMode}',
                         textAlign: TextAlign.center,
                         style: theme.textTheme.labelSmall,
@@ -210,4 +226,14 @@ class _LoginScreenState extends State<LoginScreen> {
       ),
     );
   }
+}
+
+/// Awalan Client ID OAuth untuk memastikan nilainya berasal dari project
+/// Firebase yang sama (prefix = nomor project, mis. `2232431696-...`).
+String _oauthHint() {
+  final clientId = AppConfig.googleServerClientId;
+  if (clientId.isEmpty) {
+    return 'kosong';
+  }
+  return '${clientId.substring(0, clientId.length <= 12 ? clientId.length : 12)}...';
 }
