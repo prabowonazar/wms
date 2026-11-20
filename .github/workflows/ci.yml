@@ -155,6 +155,11 @@ jobs:
           # untuk memastikan yang dipakai benar-benar client bertipe Web.
           echo "BUILD_CONFIG project=$PROJECT_ID oauth=$([ -n "$CLIENT_ID" ] && echo set || echo empty) client_head=${CLIENT_ID:0:19} len=${#CLIENT_ID}"
 
+          # AGP mencari debug keystore di ANDROID_USER_HOME (default ~/.android).
+          # Runner image mengarahkannya ke tempat lain, sehingga SHA-1 APK bisa
+          # berbeda dari keystore yang di-cache. Paksa ke ~/.android.
+          export ANDROID_USER_HOME="${HOME}/.android"
+
           flutter build apk --debug \
             --dart-define=FB_PROJECT_ID="$PROJECT_ID" \
             --dart-define=FB_API_KEY="$API_KEY" \
@@ -171,6 +176,12 @@ jobs:
           "$BUILD_TOOLS/aapt2" dump badging "$APK" | head -1
           echo "=== Sertifikat penanda tangan APK ==="
           "$BUILD_TOOLS/apksigner" verify --print-certs "$APK" | grep -i 'SHA-1'
+          for f in "$HOME"/.android/debug.keystore /usr/local/lib/android/sdk/.android/debug.keystore; do
+            if [ -f "$f" ]; then
+              echo "keystore: $f"
+              keytool -list -v -keystore "$f" -storepass android 2>/dev/null | grep 'SHA1' || true
+            fi
+          done
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
