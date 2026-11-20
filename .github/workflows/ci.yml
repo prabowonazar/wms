@@ -147,6 +147,8 @@ jobs:
           CLIENT_ID="${GOOGLE_SERVER_CLIENT_ID:-demo.apps.googleusercontent.com}"
           STORAGE_BUCKET="${FB_STORAGE_BUCKET:-}"
 
+          echo "BUILD_CONFIG project=$PROJECT_ID oauth=$([ -n "$CLIENT_ID" ] && echo set || echo empty)"
+
           flutter build apk --debug \
             --dart-define=FB_PROJECT_ID="$PROJECT_ID" \
             --dart-define=FB_API_KEY="$API_KEY" \
