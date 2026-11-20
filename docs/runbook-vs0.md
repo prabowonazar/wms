@@ -166,6 +166,20 @@ keytool -list -v `
 Salin **SHA1** ke Firebase Console -> Project settings -> Your apps -> Android app.
 Tanpa langkah ini Google Sign-In gagal dengan `ApiException: 10`.
 
+**Penting untuk APK dari CI:** sertifikat yang harus didaftarkan adalah sertifikat
+**APK hasil build**, bukan sekadar isi keystore. CI mencetaknya pada langkah
+*Verifikasi package & sertifikat APK*:
+
+```
+V2 Signer: certificate SHA-1 digest: d010a8ced014039b2f285160bcbf9a93744e8ed8
+```
+
+Nilai itu (format bertitik: `D0:10:A8:CE:D0:14:03:9B:2F:28:51:60:BC:BF:9A:93:74:4E:8E:D8`)
+harus sama dengan SHA-1 di OAuth client Android. Bila AGP memakai keystore lain,
+SHA-1 berubah dan Google membalas `canceled` setelah akun dipilih. Karena itu job
+build mengekspor `ANDROID_USER_HOME="$HOME/.android"` agar debug keystore yang
+di-cache benar-benar dipakai.
+
 ---
 
 ## 4. Firebase project
@@ -174,6 +188,8 @@ Tanpa langkah ini Google Sign-In gagal dengan `ApiException: 10`.
 2. Authentication -> Sign-in method -> aktifkan **Google**.
 3. Authentication -> Settings -> **Web SDK configuration** -> salin **Web client ID**.
    Nilai ini menjadi `GOOGLE_SERVER_CLIENT_ID`. Tanpa nilai ini `idToken` null di Android.
+   Ambil dari baris bertipe **Web application** di Google Auth Platform -> Clients;
+   Client ID Android akan ditolak (gejalanya `canceled` setelah memilih akun).
 4. Tambahkan Android app dengan package `wms.fasco` + SHA-1 debug.
 5. Buat Firestore (mode production) di region `asia-southeast2`.
 6. Aktifkan billing untuk Cloud Functions (deploy butuh Blaze).
@@ -657,6 +673,9 @@ Riwayat CI (semua kegagalan sudah diperbaiki dan dibuktikan ulang):
 |---|---|---|
 | Layar "Konfigurasi Firebase belum lengkap" | `--dart-define` kurang | Lengkapi 5 key wajib; lihat §5 |
 | Login: `id_token_missing` | `GOOGLE_SERVER_CLIENT_ID` bukan Web client ID | Salin ulang dari Firebase Authentication -> Google |
+| Login email: "Metode login ini belum diaktifkan di Firebase" | Provider Email/Password belum aktif | Authentication -> Sign-in method -> Email/Password -> Enable |
+| Login email: "Email atau kata sandi salah" | Akun belum dibuat atau salah ketik | Authentication -> Users -> Add user, lalu ulangi |
+| Login Google: `canceled` / "activity is cancelled by the user" setelah memilih akun | Menurut dokumentasi plugin, artinya konfigurasi belum cocok: SHA-1 APK, package, atau `serverClientId`. Cek `V2 Signer: certificate SHA-1 digest` di log CI, bukan SHA-1 keystore | Daftarkan SHA-1 APK; pastikan `serverClientId` = client **Web**, bukan client Android |
 | Login: `ApiException: 10` | SHA-1 belum didaftarkan | Tambahkan SHA-1 debug ke Android app di Firebase |
 | Login ditolak "belum terdaftar" | `users/{uid}` belum dibuat | Buat dokumen sesuai §4.1, tekan Coba lagi |
 | Login ditolak "dinonaktifkan" | `active=false` | Set `true` bila memang boleh masuk |
