@@ -102,7 +102,7 @@ membuatnya manual. Cara paling aman (tidak menimpa `pubspec.yaml`, `lib/`, `test
 
 ```powershell
 Set-Location app
-flutter create --platforms=android --org id.co.contoh --project-name warehouse_mobile _scaffold
+flutter create --platforms=android --org wms --project-name fasco _scaffold
 Copy-Item .\_scaffold\android .\android -Recurse
 Remove-Item .\_scaffold -Recurse -Force
 ```
@@ -120,7 +120,7 @@ android {
     defaultConfig {
         minSdk = 26          // target PRD: Android 8.0+
         targetSdk = 34
-        applicationId = "id.co.contoh.warehouse_mobile"
+        applicationId = "wms.fasco"
     }
 }
 ```
@@ -174,7 +174,7 @@ Tanpa langkah ini Google Sign-In gagal dengan `ApiException: 10`.
 2. Authentication -> Sign-in method -> aktifkan **Google**.
 3. Authentication -> Settings -> **Web SDK configuration** -> salin **Web client ID**.
    Nilai ini menjadi `GOOGLE_SERVER_CLIENT_ID`. Tanpa nilai ini `idToken` null di Android.
-4. Tambahkan Android app dengan package `id.co.contoh.warehouse_mobile` + SHA-1 debug.
+4. Tambahkan Android app dengan package `wms.fasco` + SHA-1 debug.
 5. Buat Firestore (mode production) di region `asia-southeast2`.
 6. Aktifkan billing untuk Cloud Functions (deploy butuh Blaze).
 
@@ -303,7 +303,7 @@ Actions** pada repository:
 Job `Build debug APK` mencetak **SHA-1 debug keystore CI** di log
 (`keytool -list ... | grep SHA1`). Daftarkan SHA-1 itu di Firebase Console →
 Authentication → Sign-in method → Google → **Authorized domains / SHA certificate
-fingerprints** untuk package `id.co.contoh.warehouse_mobile`. Keystore di-cache
+fingerprints** untuk package `wms.fasco`. Keystore di-cache
 agar SHA-1 stabil antar run. Setelah secret dan SHA-1 terdaftar, jalankan ulang
 workflow dan pasang artifact `app-debug-apk` terbaru.
 
@@ -462,7 +462,7 @@ Simpan semua bukti di tiket/PR. Jangan mengklaim AC tanpa artefak.
 Cek file DB terenkripsi:
 
 ```powershell
-adb exec-out run-as id.co.contoh.warehouse_mobile cat databases/warehouse.db > "$env:TEMP\warehouse.db"
+adb exec-out run-as wms.fasco cat databases/warehouse.db > "$env:TEMP\warehouse.db"
 Format-Hex -Path "$env:TEMP\warehouse.db" -Count 16
 ```
 
@@ -472,7 +472,7 @@ Header SQLite biasa adalah `53 51 4C 69 74 65 20 66 6F 72 6D 61 74 20 33 00`
 DebugView Analytics:
 
 ```powershell
-adb shell setprop debug.firebase.analytics.app id.co.contoh.warehouse_mobile
+adb shell setprop debug.firebase.analytics.app wms.fasco
 ```
 
 Lalu buka Firebase Console -> Analytics -> DebugView.

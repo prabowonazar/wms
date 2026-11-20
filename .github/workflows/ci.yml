@@ -86,7 +86,7 @@ jobs:
       - name: Scaffold Android platform (sementara)
         run: |
           if [ ! -d android ]; then
-            flutter create --platforms=android --org id.co.contoh --project-name warehouse_mobile _scaffold
+            flutter create --platforms=android --org wms --project-name fasco _scaffold
             cp -r _scaffold/android ./android
             rm -rf _scaffold
             # PRD menargetkan Android 8.0+ (minSdk 26). Default Flutter 21 dan
@@ -107,6 +107,10 @@ jobs:
               grep -n 'com.android.application' android/settings.gradle.kts
             fi
             grep -Rn "minSdk\|compileSdk\|ndkVersion" android/app/build.gradle* | head -8
+            # Nama aplikasi di launcher tetap "Gudang", bukan "fasco".
+            if [ -f android/app/src/main/AndroidManifest.xml ]; then
+              sed -i 's/android:label="[^"]*"/android:label="Gudang"/' android/app/src/main/AndroidManifest.xml
+            fi
           fi
 
       - name: Cache Android debug keystore (SHA-1 stabil antar run)
